@@ -28,11 +28,9 @@ router.post('/register', ah(async (req, res) => {
          VALUES ($1, $2, $3, $4) RETURNING id, name, email, level, languages`,
         [body.name, body.email.toLowerCase(), hash, body.languages]
       );
-      if (STARTER_CREDITS > 0) { // ledger rows must be non-zero; 0 means "no free credits"
-        await ledger.credit(c, {
-          userId: rows[0].id, amount: STARTER_CREDITS, reason: 'starter', refType: 'user', refId: rows[0].id,
-        });
-      }
+      await ledger.credit(c, {
+        userId: rows[0].id, amount: STARTER_CREDITS, reason: 'starter', refType: 'user', refId: rows[0].id,
+      });
       return rows[0];
     });
     res.status(201).json({ user, token: signToken(user) });
@@ -47,7 +45,7 @@ const loginSchema = z.object({ email: z.string().email(), password: z.string().m
 router.post('/login', ah(async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
   const { rows } = await query(
-    'SELECT id, name, email, level, languages, password_hash FROM users WHERE email = $1 AND is_platform = false',
+    'SELECT id, name, email, level, languages, password_hash FROM users WHERE email = $1',
     [email.toLowerCase()]
   );
   const row = rows[0];

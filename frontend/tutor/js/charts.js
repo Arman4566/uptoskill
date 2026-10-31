@@ -31,18 +31,18 @@ function chartSVG(sr) {
   const vals = sr.buckets.map(k => sr.cumulative ? k.cum : k.v), max = niceMax(Math.max(...vals, 1));
   const y = v => T + ih - v / max * ih, step = iw / n, x = i => L + step * i + step / 2;
   let g = "";
-  for (let i = 0; i <= 4; i++) { const v = max / 4 * i, yy = y(v); g += `<line x1="${L}" x2="${W - Rr}" y1="${yy}" y2="${yy}" stroke="#DDE6F7"/><text x="${L - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="#55627F">${Math.round(v * 10) / 10}</text>`; }
+  for (let i = 0; i <= 4; i++) { const v = max / 4 * i, yy = y(v); g += `<line x1="${L}" x2="${W - Rr}" y1="${yy}" y2="${yy}" style="stroke:var(--line)"/><text x="${L - 8}" y="${yy + 4}" text-anchor="end" font-size="11" style="fill:var(--muted)">${Math.round(v * 10) / 10}</text>`; }
   const every = Math.ceil(n / 8);
-  let lab = ""; sr.buckets.forEach((k, i) => { if (i % every === 0 || i === n - 1 && n < 10) lab += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="#55627F">${esc(k.label)}</text>`; });
+  let lab = ""; sr.buckets.forEach((k, i) => { if (i % every === 0 || i === n - 1 && n < 10) lab += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="11" style="fill:var(--muted)">${esc(k.label)}</text>`; });
   let marks = "";
   if (sr.cumulative) {
     const pts = sr.buckets.map((k, i) => `${x(i)},${y(k.cum)}`).join(" ");
-    marks += `<polygon points="${x(0)},${y(0)} ${pts} ${x(n - 1)},${y(0)}" fill="#EAF2FF"/><polyline points="${pts}" fill="none" stroke="#1D4ED8" stroke-width="3" stroke-linejoin="round"/>`;
-    sr.buckets.forEach((k, i) => { marks += `<circle cx="${x(i)}" cy="${y(k.cum)}" r="${i === n - 1 ? 5 : 3.5}" fill="${i === n - 1 ? "#FF9A4D" : "#1D4ED8"}"/>`; });
+    marks += `<polygon points="${x(0)},${y(0)} ${pts} ${x(n - 1)},${y(0)}" style="fill:var(--soft)"/><polyline points="${pts}" fill="none" style="stroke:var(--brand)" stroke-width="3" stroke-linejoin="round"/>`;
+    sr.buckets.forEach((k, i) => { marks += `<circle cx="${x(i)}" cy="${y(k.cum)}" r="${i === n - 1 ? 5 : 3.5}" style="fill:${i === n - 1 ? "var(--accent)" : "var(--brand)"}"/>`; });
     sr.buckets.forEach((k, i) => { marks += `<rect class="hit" tabindex="0" data-i="${i}" x="${x(i) - step / 2}" y="${T}" width="${step}" height="${ih}" fill="transparent"/>`; });
   } else {
     const bw = Math.max(3, Math.min(34, step * .66));
-    sr.buckets.forEach((k, i) => { const h = Math.max(k.v ? 3 : 0, k.v / max * ih); marks += `<rect x="${x(i) - bw / 2}" y="${T + ih - h}" width="${bw}" height="${h}" rx="4" fill="${k === sr.best && k.v ? "#FF9A4D" : "#1D4ED8"}" pointer-events="none"/><rect class="hit" tabindex="0" data-i="${i}" x="${x(i) - step / 2}" y="${T}" width="${step}" height="${ih}" fill="#1D4ED8" fill-opacity="0"/>`; });
+    sr.buckets.forEach((k, i) => { const h = Math.max(k.v ? 3 : 0, k.v / max * ih); marks += `<rect x="${x(i) - bw / 2}" y="${T + ih - h}" width="${bw}" height="${h}" rx="4" style="fill:${k === sr.best && k.v ? "var(--accent)" : "var(--brand)"}" pointer-events="none"/><rect class="hit" tabindex="0" data-i="${i}" x="${x(i) - step / 2}" y="${T}" width="${step}" height="${ih}" style="fill:var(--brand)" fill-opacity="0"/>`; });
   }
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Credits earned chart. ${sr.total} credits earned in this period." style="width:100%;height:auto;display:block">${g}${marks}${lab}</svg>`;
 }

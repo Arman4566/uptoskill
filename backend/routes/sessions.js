@@ -3,8 +3,6 @@ import { z } from 'zod';
 import { ah } from '../lib/async.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as sessions from '../services/sessions.js';
-import * as video from '../services/video.js';
-import * as notes from '../services/notes.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -34,28 +32,6 @@ router.get('/', ah(async (req, res) => {
 
 router.get('/:id', ah(async (req, res) => {
   res.json(await sessions.getForUser(idParam.parse(req.params.id), req.userId));
-}));
-
-// Join the video lesson (creates the private room on first use) and list its recordings.
-router.post('/:id/video-token', ah(async (req, res) => {
-  res.json(await video.joinInfo(idParam.parse(req.params.id), req.userId));
-}));
-router.get('/:id/recordings', ah(async (req, res) => {
-  res.json(await video.listRecordings(idParam.parse(req.params.id), req.userId));
-}));
-
-// Tutor's lesson notes. Saved as the tutor types; turned into a PDF for both people when the lesson ends.
-const notesSchema = z.object({ body: z.string().max(30000), images: z.array(z.string()).max(notes.MAX_IMAGES).default([]) });
-router.get('/:id/notes', ah(async (req, res) => {
-  res.json(await notes.getForTutor(idParam.parse(req.params.id), req.userId));
-}));
-router.put('/:id/notes', ah(async (req, res) => {
-  res.json(await notes.save(idParam.parse(req.params.id), req.userId, notesSchema.parse(req.body)));
-}));
-router.get('/:id/notes.pdf', ah(async (req, res) => {
-  const pdf = await notes.getPdf(idParam.parse(req.params.id), req.userId);
-  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="lesson-${req.params.id}-notes.pdf"`, 'Cache-Control': 'private, no-store' });
-  res.send(pdf);
 }));
 
 for (const action of ['accept', 'decline', 'cancel', 'start', 'complete']) {

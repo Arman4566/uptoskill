@@ -20,13 +20,58 @@ const P = {
   note: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/>',
   ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>',
   repeat: '<path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>',
-  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0M17 4.5a3.5 3.5 0 0 1 0 7M22 21a6 6 0 0 0-4-5.6"/>'
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0M17 4.5a3.5 3.5 0 0 1 0 7M22 21a6 6 0 0 0-4-5.6"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+  chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.3L4 21l1.5-4.5A8.4 8.4 0 1 1 21 11.5z"/>',
+  cap: '<path d="M22 10L12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>'
 };
 const icon = (n, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${P[n]}</svg>`;
 const ini = n => n.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 const COLORS = ["#1D4ED8", "#C2570C", "#0B2A6F", "#2563EB", "#9A3412"];
 const av = (n, s = 44) => `<span class="av" style="background:${COLORS[(n.charCodeAt(0) + n.length) % COLORS.length]};width:${s}px;height:${s}px">${ini(n)}</span>`;
 const stars = n => "★".repeat(n) + "☆".repeat(5 - n);
+
+/* ---------- profile helpers (photo, qualifications, intro video live in the shared store so the student app can read them) ---------- */
+const MYMAIL = window.UTS ? UTS.email : "guest";
+const myProf = () => UTSShared.getProfile(MYMAIL);
+const avMe = (s = 44) => { const p = myProf().photo; return p ? `<img class="av ph" src="${p}" alt="Your photo" style="width:${s}px;height:${s}px">` : av(S.me.name, s); };
+function saveProf(patch) { if (!UTSShared.setProfile(MYMAIL, patch)) { toast("Could not save: browser storage is full."); return false; } return true; }
+function syncPublic() {                 // what a student may see on a tutor card
+  UTSShared.setProfile(MYMAIL, { pub: { name: S.me.name, bio: S.me.bio, level: S.me.level, levelName: levelName(S.me.level), skills: S.me.skills, langs: S.me.langs, rating: +avgRating().toFixed(1), reviews: S.ratings.length, sessions: given().length, since: S.me.joined } });
+}
+function profileExtras() {
+  const p = myProf(), q = p.qualifications || [], v = p.video, cy = new Date().getFullYear();
+  return `<div class="card pad"><h2>${icon("camera")} Profile photo</h2><p class="mut">Learners see this on your tutor card. Use a clear photo of your face.</p>
+    <div class="row" style="gap:16px">${avMe(88)}<div class="acts"><button class="btn" data-act="photocam">${icon("camera", 18)} Take photo</button><button class="btn ghost" data-act="photogal">${icon("image", 18)} From gallery</button>${p.photo ? '<button class="btn ghost" data-act="photodel">Remove</button>' : ""}</div></div>
+    <input type="file" id="f-photo-gal" accept="image/*" data-file="photo" hidden><input type="file" id="f-photo-cam" accept="image/*" capture="user" data-file="photo" hidden></div>
+    <div class="card pad"><h2>${icon("cap")} Qualifications</h2><p class="mut">Add your degrees and certificates (up to 6). A future year means you are still studying.</p>
+    ${q.length ? q.map((x, i) => `<div class="qrow"><div><b>${esc(x.deg)}</b><span>${esc(x.inst)} · ${x.year > cy ? "Pursuing, " + x.year : x.year}</span></div><button class="ib" aria-label="Remove ${esc(x.deg)}" data-act="rmqual" data-id="${i}">${icon("x", 15)}</button></div>`).join("") : '<p class="mut">No qualification added yet.</p>'}
+    <div class="qadd"><input class="in" id="q-deg" maxlength="80" placeholder="Degree / certificate, e.g. B.Tech CSE" aria-label="Degree"><input class="in" id="q-inst" maxlength="80" placeholder="Institute" aria-label="Institute"><input class="in" id="q-yr" type="number" min="1980" max="${cy + 6}" placeholder="Year" aria-label="Year"><button class="btn ghost" data-act="addqual">${icon("plus", 18)} Add</button></div></div>
+    <div class="card pad"><h2>${icon("video")} Intro video</h2><p class="mut">Learners can watch this on your profile. Max 1 minute. Portrait (9:16) or landscape (16:9) only.</p>
+    ${v ? `<div class="vwrap ${v.ratio === "9:16" ? "portrait" : "land"}"><video id="pvid" controls playsinline preload="metadata"></video></div><p class="mut">${v.ratio} · ${Math.round(v.duration)} s · ${(v.size / 1048576).toFixed(1)} MB</p>` : empty("No intro video yet", "A short hello video helps learners trust and pick you.")}
+    <div class="acts"><button class="btn" data-act="vidcam">${icon("video", 18)} Record video</button><button class="btn ghost" data-act="vidgal">${icon("image", 18)} From gallery</button>${v ? '<button class="btn ghost" data-act="viddel">Remove</button>' : ""}</div>
+    <input type="file" id="f-vid-gal" accept="video/*" data-file="video" hidden><input type="file" id="f-vid-cam" accept="video/*" capture="user" data-file="video" hidden></div>`;
+}
+function loadMyVideo() { const el = $("#pvid"); if (el) UTSShared.getVideo(MYMAIL).then(b => { if (b && $("#pvid") === el) el.src = URL.createObjectURL(b); }); }
+
+/* webcam capture for desktop (phones use the file input with capture, which opens the camera app) */
+let camStream = null;
+function stopCam() { if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; } }
+async function openWebcam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast("No camera found here. Pick a photo from the gallery."); return $("#f-photo-gal").click(); }
+  try { camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 960 } }, audio: false }); }
+  catch (e) { return toast("Camera is blocked or missing. Allow camera access, or choose from gallery."); }
+  modal(`<h3>Take a profile photo</h3><div class="cam"><video id="camv" autoplay playsinline muted></video></div><div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="camshot">${icon("camera", 18)} Capture</button></div>`);
+  $("#camv").srcObject = camStream;
+}
+function setPhoto(dataUrl) { if (saveProf({ photo: dataUrl })) { toast("Profile photo updated"); go("profile", null, true); } }
+const FILE = {
+  photo: el => { const f = el.files[0]; el.value = ""; if (f) UTSShared.photoFromFile(f).then(setPhoto).catch(e => toast(e.message)); },
+  video: el => { const f = el.files[0]; el.value = ""; if (!f) return; toast("Checking video...");
+    UTSShared.saveVideo(MYMAIL, f).then(m => { toast(`Intro video saved (${m.ratio}, ${Math.round(m.duration)} s)`); go("profile", null, true); }).catch(e => toast(e.message || "Could not save the video.")); }
+};
+
 
 let page = "dashboard", arg = null;
 const T = { sess: "upcoming", board: "open", earn: "month", lf: "all", bq: "", bt: "Any", openReq: {} };
@@ -40,13 +85,14 @@ function nextToast() {
   setTimeout(() => { t.className = ""; setTimeout(() => { toastBusy = false; nextToast(); }, 250); }, 3000);
 }
 function modal(h, wide) { $("#modal").innerHTML = `<div class="mod ${wide ? "wide" : ""}" role="dialog" aria-modal="true">${h}</div>`; $("#modal").hidden = false; const f = $("#modal input,#modal textarea,#modal select,#modal .btn"); if (f) f.focus(); }
-const closeModal = () => { $("#modal").hidden = true; };
+const closeModal = () => { stopCam(); $("#modal").hidden = true; };
 
 /* ---------- navigation ---------- */
+const unreadMsgs = () => window.UTSShared ? UTSShared.tutorThreads(MYMAIL).reduce((n, c) => n + c.unread, 0) : 0;
 const reqCount = () => S.sessions.filter(s => s.status === "requested").length;
 const instOpen = () => S.instant.filter(r => r.status === "open" && !r.skipped);
 function menu() {
-  return [["dashboard", "Dashboard", "grid"], ["requests", "Session Requests", "inbox", reqCount()], ["sessions", "My Sessions", "cal"], ["availability", "Availability", "clock"],
+  return [["dashboard", "Dashboard", "grid"], ["requests", "Session Requests", "inbox", reqCount()], ["messages", "Messages", "chat", unreadMsgs()], ["sessions", "My Sessions", "cal"], ["availability", "Availability", "clock"],
     ["instant", "Instant Help", "bolt", S.me.online ? instOpen().length : 0], ["board", "Doubt Board", "help"], ["earnings", "Earnings", "wallet"], ["reviews", "Reviews", "star"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
 }
 function levelCard() {
@@ -56,15 +102,15 @@ function levelCard() {
   return `<div class="lvl"><h4>${icon("medal", 16)} Level ${l} · ${levelName(l)}</h4><p>${need} to reach Level ${l + 1} ${levelName(l + 1)}</p><div class="bar"><i style="width:${Math.min(100, Math.round(n / nx[0] * 100))}%"></i></div><p>${n} / ${nx[0]} sessions given · rating ${r.toFixed(1)}</p></div>`;
 }
 function renderNav() {
+  syncPublic();
   $("#nav").innerHTML = `<div class="logo"><img class="logo-full" src="../assets/logo.png" alt="UpToSkill"><img class="logo-icon" src="../assets/logo-icon.png" alt="UpToSkill"></div>` +
     menu().map(([id, l, i, n]) => `<button class="nav-item ${id === page || (id === "sessions" && page === "room") ? "on" : ""}" data-act="go" data-id="${id}" ${id === page ? 'aria-current="page"' : ""}>${icon(i)}<span>${l}</span>${n ? `<em class="badge-n">${n}</em>` : ""}</button>`).join("") +
-    `<a class="nav-item" href="../lessons.html">${icon("video")}<span>Video Lessons</span></a><a class="nav-item" href="../wallet.html">${icon("wallet")}<span>Withdraw Money</span></a>` +
-    `<div class="side">${levelCard()}<div class="me"><b>${esc(S.me.name)}</b>Tutor · Level ${S.me.level} ${levelName(S.me.level)}<span class="mc">${icon("wallet", 14)} ${bal("me")} credits</span></div><button class="btn ghost" data-act="logout">Log out</button></div>`;
+    `${UTSTheme.control()}<div class="side">${levelCard()}<div class="me"><div class="mehead">${avMe(40)}<div><b>${esc(S.me.name)}</b>Tutor · Level ${S.me.level} ${levelName(S.me.level)}</div></div><span class="mc">${icon("wallet", 14)} ${bal("me")} credits</span></div><button class="btn ghost" data-act="logout">Log out</button></div>`;
 }
 function go(id, a, keep) {
   const y = keep ? window.scrollY : 0;
   roomTimers.forEach(clearInterval); roomTimers = [];
-  page = id; arg = a ?? null; try { location.hash = id === "room" ? "room/" + a : id; } catch (e) { }
+  page = id; arg = a ?? null; if (window.UTSBack && !keep) UTSBack.note(id, arg); try { location.hash = id === "room" ? "room/" + a : id; } catch (e) { }
   renderNav(); $("#main").innerHTML = PAGES[id](a); (AFTER[id] || (() => { }))(a); window.scrollTo(0, y);
 }
 function refresh() {
@@ -97,11 +143,11 @@ const upcoming = () => S.sessions.filter(s => s.status === "accepted" || s.statu
 function sessionCard(s) {
   const l = user(s.learnerId), st = STATUS[s.status], c = s.status === "completed" ? `+${s.credits} paid` : ["cancelled", "no_show"].includes(s.status) ? `${s.credits} released` : `${s.credits} held`;
   const rt = S.ratings.find(r => r.sid === s.id);
-  const btn = s.status === "accepted" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Join room</button><button class="btn ghost" data-act="cancel" data-id="${s.id}">Cancel</button><button class="btn ghost" data-act="noshow" data-id="${s.id}">No-show</button>`
+  const btn = s.status === "accepted" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Join room</button><button class="btn ghost" data-act="resched" data-id="${s.id}">${icon("clock", 18)} Reschedule</button><button class="btn ghost" data-act="cancel" data-id="${s.id}">Cancel</button><button class="btn ghost" data-act="noshow" data-id="${s.id}">No-show</button>`
     : s.status === "in_progress" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Rejoin room</button><button class="btn orange" data-act="endsession" data-id="${s.id}">End session</button>`
     : s.status === "completed" ? `<button class="btn ghost" data-act="notes" data-id="${s.id}">${icon("note", 18)} Session notes</button>` : "";
   return `<div class="card lec"><div class="when"><small>${dayName(s.slotTs)}</small><b>${clock(s.slotTs)}</b></div><div class="info"><div class="t">${esc(s.title)}</div><div class="w">with ${esc(l.name)} · ${esc(s.tags.join(", "))} · ${s.type === "instant" ? "Instant Help" : "Booked"}</div>
-    <div class="m"><span class="chip">${s.minutes} min</span><span class="chip o">${c}</span><span class="chip ${st[0]}">${st[1]}</span>${rt ? `<span class="chip g">${rt.stars}★ from learner</span>` : ""}${s.status === "completed" && s.noteStatus === "unavailable" ? '<span class="chip n">Notes unavailable</span>' : ""}</div></div><div class="acts">${btn}</div></div>`;
+    <div class="m"><span class="chip">${s.minutes} min</span><span class="chip o">${c}</span><span class="chip ${st[0]}">${st[1]}</span>${(s.reschedules || []).length ? `<span class="chip o" title="Moved ${(s.reschedules || []).length} time(s)">Rescheduled ×${s.reschedules.length}</span>` : ""}${(s.delays || []).length ? `<span class="chip o" title="The learner moved this lecture">Delayed by learner ×${s.delays.length}</span>` : ""}${rt ? `<span class="chip g">${rt.stars}★ from learner</span>` : ""}${s.status === "completed" && s.noteStatus === "unavailable" ? '<span class="chip n">Notes unavailable</span>' : ""}</div></div><div class="acts">${btn}</div></div>`;
 }
 function boardCard(b) {
   const a = user(b.authorId), mine = b.authorId === "me", myAns = b.answers.find(x => x.helperId === "me");
@@ -135,6 +181,10 @@ const PAGES = {
       `<div class="tabs">${[["upcoming", "Upcoming"], ["past", "Past"]].map(([k, l]) => `<button class="btn ${T.sess === k ? "" : "ghost"}" data-act="stab" data-id="${k}">${l}</button>`).join("")}</div>` +
       (list.length ? list.slice(0, 40).map(sessionCard).join("") : empty("Nothing here yet", "Accept a request or take an Instant Help call."));
   },
+  messages() {
+    const th = UTSShared.tutorThreads(MYMAIL);
+    return head("Messages", "Learners can chat with you from their Recommended tutors list.") + (th.length ? th.map(threadCard).join("") : empty("No messages yet", "When a learner opens your card and taps Chat, the conversation shows up here."));
+  },
   availability() {
     const slots = S.slots.slice().sort((a, b) => a.start - b.start).filter(x => x.end > Date.now() - DAY), days = {};
     slots.forEach(x => (days[startOfDay(x.start)] = days[startOfDay(x.start)] || []).push(x));
@@ -149,13 +199,13 @@ const PAGES = {
       (done.length ? `<section class="sec">${sec("Recent", "clock")}<div class="card"><table><tr><th>Learner</th><th>Topic</th><th>Result</th></tr>${done.map(r => `<tr><td>${esc(user(r.learnerId).name)}</td><td>${esc(r.title)}</td><td>${lab[r.status]}${r.by ? " by " + esc(r.by) : ""}</td></tr>`).join("")}</table></div></section>` : "");
   },
   board() {
-    return head("Doubt Board", "Answer a bounty. If the learner accepts your answer, the escrowed reward is paid to you. Solved bounties stay as a knowledge base.", `<button class="btn" data-act="postbounty">${icon("plus", 18)} Post a bounty</button>`) +
+    return head("Doubt Board", "Answer a bounty. If the learner accepts your answer, the escrowed reward is paid to you. Solved bounties stay as a knowledge base.") +
       `<div class="tabs">${[["open", "Open"], ["solved", "Solved"], ["expired", "Expired"], ["mine", "My answers"]].map(([k, l]) => `<button class="btn ${T.board === k ? "" : "ghost"}" data-act="btab" data-id="${k}">${l}</button>`).join("")}</div>
       <div class="card search"><label>${icon("help")}<input id="bq" data-inp="bq" value="${esc(T.bq)}" placeholder="Search doubts" aria-label="Search doubts"></label><select class="in" data-chg="bt" aria-label="Filter by topic">${["Any", ...VOCAB].map(o => `<option ${T.bt === o ? "selected" : ""}>${o}</option>`).join("")}</select></div><div id="blist" class="sec"></div>`;
   },
   earnings() {
     const sr = series(T.earn), life = earnRows().reduce((n, r) => n + r.delta, 0), rows = S.ledger.filter(r => r.uid === "me" && (T.lf === "all" || (T.lf === "earn" ? EARN.includes(r.reason) : !EARN.includes(r.reason)))).sort((a, b) => b.ts - a.ts);
-    const unit = { day: "hour", month: "day", year: "month", total: "month" }[T.earn], R = { starter: "Starter", payout: "Session payout", bonus: "Rating bonus", bounty_payout: "Bounty payout", bounty_hold: "Bounty escrow", bounty_refund: "Bounty refund", hold: "Hold", release: "Release", platform_fee: "Fee" };
+    const unit = { day: "hour", month: "day", year: "month", total: "month" }[T.earn], R = { starter: "Starter", payout: "Session payout", bonus: "Rating bonus", bounty_payout: "Bounty payout", bounty_hold: "Bounty escrow", bounty_refund: "Bounty refund", hold: "Hold", release: "Release", platform_fee: "Fee", reschedule_fee: "Reschedule fee", delay_fee: "Delay fee" };
     return head("Earnings", "Everything you earned from mentoring, built from your credit ledger.") +
       `<div class="stats">${[["Available balance", bal("me") + " credits", "SUM of your ledger rows"], ["In escrow for you", escrowIn() + " credits", "Paid when sessions complete"], ["Lifetime earned", life + " credits", "Sessions + bounties + bonuses"]].map(s => `<div class="card stat"><div><small>${s[0]}</small><b>${s[1]}</b><em>${s[2]}</em></div></div>`).join("")}</div>
       <section class="card pad"><div class="row" style="justify-content:space-between"><h2>${icon("bar")} Credits earned</h2><div class="tabs" role="tablist">${PERIODS.map(([k, l]) => `<button role="tab" aria-selected="${T.earn === k}" class="btn sm ${T.earn === k ? "" : "ghost"}" data-act="period" data-id="${k}">${l}</button>`).join("")}</div></div>
@@ -175,13 +225,14 @@ const PAGES = {
       rs.slice(0, 30).map(r => `<div class="card pad"><div class="row"><span class="st">${stars(r.stars)}</span><b>${esc(user(r.learnerId).name)}</b><span class="mut" style="margin-left:auto">${ago(r.ts)} · ${esc(sess(r.sid)?.title || "")}</span></div><p style="margin:0">“${esc(r.comment)}”</p></div>`).join("");
   },
   leaderboard() {
-    return head("Leaderboard", "Top helpers by sessions given, then rating.") + leaderboard().map((r, i) => `<div class="card lb ${r.me ? "you" : ""}"><span class="n">#${i + 1}</span>${av(r.name, 36)}<span class="nm">${esc(r.name)}${r.me ? " (You)" : ""} <span class="chip n">Level ${r.level} ${levelName(r.level)}</span></span><span class="chip">${r.sessions} sessions</span><span class="chip o">${r.rating.toFixed(1)}★</span></div>`).join("") + `<p class="mut">Top 3 earn the "Top helper" badge.</p>`;
+    return head("Leaderboard", "Top helpers by sessions given, then rating.") + leaderboard().map((r, i) => `<div class="card lb ${r.me ? "you" : ""}"><span class="n">#${i + 1}</span>${r.me ? avMe(36) : av(r.name, 36)}<span class="nm">${esc(r.name)}${r.me ? " (You)" : ""} <span class="chip n">Level ${r.level} ${levelName(r.level)}</span></span><span class="chip">${r.sessions} sessions</span><span class="chip o">${r.rating.toFixed(1)}★</span></div>`).join("") + `<p class="mut">Top 3 earn the "Top helper" badge.</p>`;
   },
   profile() {
     const m = S.me, owned = m.skills.map(s => s.n), expN = ["", "Beginner", "Intermediate", "Expert"];
     return head("Profile", "Your public mentor profile, level, badges and settings.") +
-      `<div class="card pad"><div class="row">${av(m.name, 56)}<div><b style="font-size:18px">${esc(m.name)}</b><div class="mut">Level ${m.level} ${levelName(m.level)} · ${given().length} sessions · ${avgRating().toFixed(1)}★ · ${bal("me")} credits</div></div></div>
+      `<div class="card pad"><div class="row">${avMe(56)}<div><b style="font-size:18px">${esc(m.name)}</b><div class="mut">Level ${m.level} ${levelName(m.level)} · ${given().length} sessions · ${avgRating().toFixed(1)}★ · ${bal("me")} credits</div></div></div>
       <label class="f">Name<input class="in" id="pn" value="${esc(m.name)}" maxlength="40"></label><label class="f">Bio<textarea class="in" id="pb" rows="2" maxlength="200">${esc(m.bio)}</textarea></label><div><button class="btn" data-act="savebio">Save profile</button></div></div>
+      ${profileExtras()}
       <div class="card pad"><b>Languages you teach in</b><div class="tags">${LANGS.map(l => `<button class="chip pick ${m.langs.includes(l) ? "on" : ""}" aria-pressed="${m.langs.includes(l)}" data-act="lang" data-id="${l}">${l}</button>`).join("")}</div>
       <b>Skills and experience</b><div class="tags">${m.skills.map((s, i) => `<span class="chip">${esc(s.n)} · <select class="mini" data-chg="exp" data-i="${i}" aria-label="Experience for ${esc(s.n)}">${[1, 2, 3].map(n => `<option value="${n}" ${s.exp === n ? "selected" : ""}>${expN[n]}</option>`).join("")}</select> <button class="ib" aria-label="Remove ${esc(s.n)}" data-act="rmskill" data-id="${i}">${icon("x", 13)}</button></span>`).join("")}</div>
       <div class="row"><select class="in" id="ps">${VOCAB.filter(v => !owned.includes(v)).map(v => `<option>${v}</option>`).join("")}</select><button class="btn ghost" data-act="addskill">Add skill</button></div></div>
@@ -205,6 +256,12 @@ const PAGES = {
       <div class="row"><button class="btn orange" data-act="endsession" data-id="${s.id}">End session &amp; confirm completion</button><button class="btn ghost" data-act="learnerwin" data-id="${s.id}">${icon("users", 18)} Open learner window</button><button class="btn ghost" data-act="jitsi" data-id="${s.id}">${icon("ext", 18)} Video call (Jitsi)</button><button class="btn ghost" data-act="go" data-id="sessions">Leave room</button></div></div>`;
   }
 };
+function threadCard(c) {
+  const name = (c.msgs.find(m => m.from === "student") || {}).name || c.student, id = esc(c.id);
+  return `<div class="card pad thread"><div class="row">${av(name, 40)}<div style="flex:1"><b>${esc(name)}</b><div class="mut">${c.student === "student@demo.com" ? "Demo learner" : esc(c.student)}</div></div>${c.unread ? `<span class="chip o">${c.unread} new</span>` : ""}</div>
+    <div class="msgs" style="height:200px">${c.msgs.map(m => `<div class="msg ${m.from === "tutor" ? "mine" : ""}"><small>${m.from === "tutor" ? "You" : esc(m.name)} · ${clock(m.ts)}</small>${esc(m.text)}</div>`).join("")}</div>
+    <div class="row"><input class="in" data-reply="${id}" maxlength="500" placeholder="Write a reply and press Enter" aria-label="Reply to ${esc(name)}"><button class="btn" data-act="msgsend" data-id="${id}">${icon("send", 16)} Reply</button></div></div>`;
+}
 function instantBanner(r, full) {
   const l = user(r.learnerId), left = Math.max(0, Math.ceil((r.expiresTs - Date.now()) / 1000));
   return `<div class="live"><span class="pulse"></span><div class="info"><b>${esc(l.name)} needs instant help · ${esc(r.tags.join(", "))}</b><p>${r.minutes} min · ${r.credits} credit${r.credits > 1 ? "s" : ""} · “${esc(r.title)}” · <span data-cd="${r.expiresTs}">${left}s</span> left</p><div class="bar cd"><i data-cdbar="${r.createdTs},${r.expiresTs}" style="width:${Math.max(0, left / 60 * 100)}%"></i></div>${full && r.brief ? briefHTML({ brief: r.brief, problem: r.problem, id: r.id }) : ""}</div>
@@ -214,7 +271,7 @@ function drawBoard() {
   const q = T.bq.trim().toLowerCase(), f = b => (T.board === "mine" ? b.answers.some(a => a.helperId === "me") : b.status === T.board) && (!q || (b.title + b.tags.join(" ")).toLowerCase().includes(q)) && (T.bt === "Any" || b.tags.includes(T.bt));
   const l = S.bounties.filter(f); $("#blist").innerHTML = l.length ? l.map(boardCard).join("") : empty("Nothing here", T.board === "open" ? "No open doubts match your filters." : "No bounties in this tab yet.");
 }
-const AFTER = { board: drawBoard, earnings() { const b = $("#cbox"); if (b) bindChart(b, series(T.earn)); }, room(id) { if (sess(id)) initRoom(id, "tutor"); } };
+const AFTER = { messages() { UTSShared.tutorThreads(MYMAIL).forEach(c => { if (c.unread) UTSShared.chatSeen(c.id, "tutor"); }); renderNav(); $$(".msgs").forEach(m => m.scrollTop = m.scrollHeight); }, board: drawBoard, profile: loadMyVideo, earnings() { const b = $("#cbox"); if (b) bindChart(b, series(T.earn)); }, room(id) { if (sess(id)) initRoom(id, "tutor"); } };
 
 /* ---------- live room (works in two browser windows through localStorage events) ---------- */
 function drawRoom(id, who) {
@@ -250,6 +307,46 @@ function sendChat(id, who) {
 const ok = r => { if (!r.ok) toast(r.err); return r.ok; };
 const ACT = {
   go: id => go(id),
+  theme: id => { UTSTheme.set(id); renderNav(); },
+  msgsend: id => {
+    const sel = () => document.querySelector(`input[data-reply="${CSS.escape(id)}"]`), inp = sel(), v = inp ? inp.value.trim() : ""; if (!v) return;
+    UTSShared.chatSend(id, "tutor", S.me.name, v); go("messages", null, true); const again = sel(); if (again) again.focus();
+  },
+  photogal: () => $("#f-photo-gal").click(),
+  photocam: () => { if (window.matchMedia && matchMedia("(pointer: coarse)").matches) $("#f-photo-cam").click(); else openWebcam(); },
+  camshot: () => { const v = $("#camv"); if (!v || !v.videoWidth) return toast("Camera is still starting..."); const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0);
+    const u = c.toDataURL("image/jpeg", .9); closeModal(); UTSShared.squarePhoto(u).then(setPhoto).catch(e => toast(e.message)); },
+  photodel: () => { if (saveProf({ photo: "" })) { toast("Photo removed"); go("profile", null, true); } },
+  addqual: () => {
+    const d = $("#q-deg").value.trim(), i = $("#q-inst").value.trim(), y = Math.round(+$("#q-yr").value), cy = new Date().getFullYear(), q = (myProf().qualifications || []).slice();
+    if (d.length < 2) return toast("Enter your degree or certificate"); if (i.length < 2) return toast("Enter the institute name");
+    if (!(y >= 1980 && y <= cy + 6)) return toast(`Enter a year between 1980 and ${cy + 6}`); if (q.length >= 6) return toast("You can list up to 6 qualifications");
+    q.push({ deg: d.slice(0, 80), inst: i.slice(0, 80), year: y }); if (saveProf({ qualifications: q })) { toast("Qualification added"); go("profile", null, true); }
+  },
+  rmqual: id => { const q = (myProf().qualifications || []).slice(); q.splice(+id, 1); if (saveProf({ qualifications: q })) go("profile", null, true); },
+  vidgal: () => $("#f-vid-gal").click(),
+  vidcam: () => $("#f-vid-cam").click(),
+  viddel: () => UTSShared.removeVideo(MYMAIL).then(() => { toast("Intro video removed"); go("profile", null, true); }),
+  resched: id => {
+    const s = sess(id), l = user(s.learnerId), fee = reschedFee(s.credits), def = new Date(s.slotTs + HR), dd = startOfDay(def.getTime()), p2 = n => String(n).padStart(2, "0");
+    const days = [0, 1, 2, 3, 4, 5, 6, 7].map(i => { const t = startOfDay(Date.now()) + i * DAY; return `<option value="${t}" ${t === dd ? "selected" : ""}>${dayName(t)}</option>`; }).join("");
+    modal(`<h3>Reschedule session</h3><p class="mut">“${esc(s.title)}” with ${esc(l.name)}<br>Now: <b>${when(s.slotTs)}</b></p>
+      <label class="f">New day<select class="in" id="rs-d">${days}</select></label><label class="f">New time<input class="in" id="rs-t" type="time" value="${p2(def.getHours())}:${p2(def.getMinutes())}"></label>
+      <label class="f">Reason<select class="in" id="rs-r"><option>Urgent work</option><option>Health or family emergency</option><option>Internet or power problem</option><option>Student asked for a new time</option><option>Other</option></select></label>
+      <label class="f">Message to ${esc(l.name.split(" ")[0])} (optional)<textarea class="in" id="rs-m" rows="2" maxlength="160" placeholder="e.g. Sorry, a college event came up."></textarea></label>
+      <label class="chk"><input type="checkbox" id="rs-ok"> I talked with ${esc(l.name.split(" ")[0])} and they agree to the new time.</label>
+      <p class="note-fee">Reschedule fee: ${RESCHEDULE_PCT}% of ${s.credits} credits = <b>${fee} credits</b>, deducted from your balance. ${esc(l.name.split(" ")[0])} gets a notification.</p>
+      <div class="row"><button class="btn ghost" data-act="close">Keep current time</button><button class="btn orange" data-act="reschedyes" data-id="${id}">Confirm new time</button></div>`);
+  },
+  reschedyes: id => {
+    const s = sess(id); if (!s) return; if (!$("#rs-ok").checked) return toast("Please confirm you talked with the student");
+    const day = new Date(+$("#rs-d").value), [h, m] = ($("#rs-t").value || "").split(":").map(Number); if (isNaN(h)) return toast("Pick the new time");
+    day.setHours(h, m, 0, 0); const ts = day.getTime(), reason = $("#rs-r").value, msg = $("#rs-m").value.trim(), l = user(s.learnerId);
+    const r = Sess.reschedule(id, ts, reason); if (!ok(r)) return; save(); closeModal();
+    const sent = UTSShared.notify(learnerEmail(s.learnerId), { kind: "reschedule", title: "Lecture rescheduled", mentor: S.me.name, sessionTitle: s.title, fromTs: r.from, toTs: ts, reason,
+      body: `${S.me.name} moved “${s.title}” from ${when(r.from)} to ${when(ts)}. Reason: ${reason}.${msg ? " Message: " + msg : ""}` });
+    toast(`Moved to ${when(ts)}. Fee ${r.fee} credits. ${sent ? l.name.split(" ")[0] + " was notified." : "Notification saved (this learner has no demo login)."}`); go("sessions");
+  },
   online: () => { S.me.online = !S.me.online; if (S.me.online) S.spawn.inst = Math.min(S.spawn.inst, Date.now() + 4000); save(); toast(S.me.online ? "You are visible for Instant Help" : "You are offline"); go(page, arg, true); },
   togglebrief: id => { T.openReq[id] = !T.openReq[id]; go(page, arg, true); },
   genbrief: id => { const s = sess(id); AI.call(() => AI.analyze(s.problem)).then(a => { s.brief = { problem_summary: a.problem_summary, already_tried: a.already_tried, topics_to_prepare: a.topics_to_prepare }; save(); toast("AI brief ready"); go(page, arg, true); }).catch(e => toast("AI unavailable: " + e.message)); toast("Generating brief..."); },
@@ -286,11 +383,6 @@ const ACT = {
   answer: id => { const v = ($("#ba" + id) || {}).value; if (!v || v.trim().length < 8) return toast("Write a helpful answer (at least 8 characters)"); const b = S.bounties.find(x => x.id == id);
     b.answers.push({ id: S.nid++, helperId: "me", body: v.trim().slice(0, 600), accepted: false, ts: Date.now() }); b.acceptAt = Date.now() + 8000 + Math.random() * 4000; b.pickMine = Math.random() < .75; save(); toast("Answer submitted. Waiting for the author to choose."); drawBoard(); },
   acceptans: (id, el) => { const b = S.bounties.find(x => x.id == id); if (ok(acceptBounty(b, +el.dataset.r))) { save(); toast("Accepted. Reward paid to the helper."); go("board"); } },
-  postbounty: () => modal(`<h3>Post a bounty</h3><p class="mut">Reward is locked in escrow now. Unanswered after 24 hours, it is refunded automatically. Balance: ${bal("me")} credits.</p>
-    <label class="f">Your problem<textarea class="in" id="bn1" rows="3" maxlength="300" placeholder="Describe the error or question"></textarea></label><label class="f">Topic<select class="in" id="bn2">${VOCAB.map(v => `<option>${v}</option>`).join("")}</select></label><label class="f">Reward (1 to 10 credits)<input class="in" id="bn3" type="number" min="1" max="10" value="2"></label>
-    <div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="postyes">Post bounty</button></div>`),
-  postyes: () => { const t = $("#bn1").value.trim(), rw = Math.round(+$("#bn3").value); if (t.length < 10) return toast("Describe the problem in a few words"); if (!(rw >= 1 && rw <= 10)) return toast("Reward must be 1 to 10 credits");
-    const r = postBounty(t, [$("#bn2").value], rw); if (!ok(r)) return; save(); closeModal(); T.board = "open"; toast(`Bounty posted. ${rw} credits locked.`); go("board"); },
   period: id => { T.earn = id; go("earnings", null, true); },
   addslot: () => { const o = [0, 1, 2, 3, 4, 5, 6].map(i => { const t = startOfDay(Date.now()) + i * DAY; return `<option value="${t}">${dayName(t)}</option>`; }).join("");
     modal(`<h3>Add availability slot</h3><label class="f">Day<select class="in" id="sd">${o}</select></label><label class="f">From<input class="in" id="s1" type="time" value="18:00"></label><label class="f">To<input class="in" id="s2" type="time" value="19:00"></label><div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="slotyes">Add slot</button></div>`); },
@@ -315,8 +407,9 @@ const CHG = {
 const INP = { bq: v => { T.bq = v; drawBoard(); } };
 document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b) { if (e.target.id === "modal") closeModal(); return; } if (b.disabled) return; ACT[b.dataset.act](b.dataset.id, b); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); if ((e.key === "Enter" || e.key === " ") && e.target.matches("a[data-act]")) { e.preventDefault(); e.target.click(); } });
-document.addEventListener("change", e => { const k = e.target.dataset.chg; if (k) CHG[k](e.target.value, e.target); });
+document.addEventListener("change", e => { const f = e.target.dataset.file; if (f) return FILE[f](e.target); const k = e.target.dataset.chg; if (k) CHG[k](e.target.value, e.target); });
 document.addEventListener("input", e => { const k = e.target.dataset.inp; if (k) INP[k](e.target.value); });
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset && e.target.dataset.reply) ACT.msgsend(e.target.dataset.reply); });
 
 /* ---------- learner window (second browser window for the live room) ---------- */
 function learnerView(id, token) {
@@ -332,6 +425,30 @@ function learnerView(id, token) {
   initRoom(id, "learner"); $("#lsend").onclick = () => sendChat(id, "learner"); $("#lend").onclick = () => { roomSet(id, r => r.endReq = true); toast("Mentor notified"); };
 }
 
+/* ---------- a learner delayed a lecture (sent from the student app) ---------- */
+function checkStudentNotifs() {
+  if (learnerMode || !window.UTSShared) return;
+  const un = UTSShared.tutorNotifications(MYMAIL).filter(n => !n.read); if (!un.length) return;
+  const lines = [];
+  un.forEach(n => {
+    if (n.kind !== "delay") return;
+    const name = n.studentName || "A learner";
+    const s = S.sessions.filter(x => x.status === "accepted" && learnerEmail(x.learnerId) === n.fromStudent).sort((a, b) => Math.abs(a.slotTs - n.fromTs) - Math.abs(b.slotTs - n.fromTs))[0];
+    if (!s) { lines.push([`${name} delayed a lecture`, `“${n.sessionTitle}” was moved to ${when(n.toTs)}. Reason: ${n.reason}. It is not an accepted session in your list, so nothing changed here.`]); return; }
+    const old = s.slotTs, sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; }
+    s.slotId = null; s.slotTs = n.toTs; s.delays = (s.delays || []).concat([{ from: old, to: n.toTs, fee: n.fee || 0, reason: n.reason, ts: n.ts }]);
+    if (n.fee) addLedger("me", n.fee, "delay_fee", "delay", n.id, `Delay fee: ${name} (${s.title})`);
+    lines.push([`${name} delayed a lecture`, `“${s.title}” moved from ${when(old)} to ${when(n.toTs)}. Reason: ${n.reason}.${n.note ? " Message: " + n.note : ""}${n.fee ? ` You received ${n.fee} credits as delay fee.` : ""}`]);
+  });
+  save(); UTSShared.markTutorRead(MYMAIL);
+  if (!lines.length) return;
+  if (page !== "room") go(page, arg, true);
+  modal(`<h3>Notifications</h3><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${lines.map(l => `<div class="rep"><b>${esc(l[0])}</b><br>${esc(l[1])}</div>`).join("")}</div><div class="row"><button class="btn" data-act="close">Got it</button></div>`);
+}
+window.addEventListener("storage", e => { if (e.key === "uts_tnotifs") checkStudentNotifs(); if (e.key === "uts_chats") { if (page === "messages" && !(document.activeElement && document.activeElement.dataset.reply)) go("messages", null, true); else renderNav(); } });
+window.addEventListener("focus", checkStudentNotifs);
+window.addEventListener("uts-theme", renderNav);
+
 /* ---------- boot ---------- */
 function tick() {
   const ch = sweep();
@@ -345,6 +462,6 @@ window.addEventListener("uts-change", () => { if (!learnerMode) refresh(); });
 (function boot() {
   const q = new URLSearchParams(location.search);
   if (q.get("as") === "learner" && q.get("room")) { learnerMode = true; return learnerView(q.get("room"), q.get("t")); }
-  const h = location.hash.slice(1).split("/"), start = PAGES[h[0]] && h[0] !== "room" ? h[0] : "dashboard"; go(start);
+  const h = location.hash.slice(1).split("/"), start = PAGES[h[0]] && h[0] !== "room" ? h[0] : "dashboard"; go(start); checkStudentNotifs();
   setInterval(tick, 1000);
 })();

@@ -1,0 +1,30 @@
+/* Dark theme for the student + tutor apps. style.css defines the light values as variables; this file overrides them. */
+html{color-scheme:light}
+html[data-theme=dark]{color-scheme:dark}
+html[data-theme=dark]{
+  --brand:#4C8DFF;--soft:#14264A;--line:#22345A;--line2:#34497A;--bg:#0A1226;--card:#101B36;--hover:#17284D;
+  --ink:#EAF1FF;--ink2:#C9D6F2;--muted:#9AABCB;
+  --accent:#FF9A4D;--accent-soft:#33210F;--accent-chip:#4A2F14;--accent-text:#FFD3A8;--accent-line:#6A4620;--accent-ico:#FFB170;
+  --ok-bg:#10392A;--ok-ink:#86EFAC;--neutral-bg:#1B2A4A;--neutral-ink:#C3CFE8;--neg:#FF8A80;--pos:#7EE2A3;
+  --notice-ink:#BCD3FF;--track:#4A2F14;--ph:#0A1226;--shadow:rgba(0,0,0,.65);--glow:rgba(76,141,255,.55);
+}
+html[data-theme=dark] .hero{background:linear-gradient(135deg,#1B3FA8,#173480)}
+html[data-theme=dark] .room{background:#173480}
+html[data-theme=dark] #toast{background:#EAF1FF;color:#0F1B3D}
+html[data-theme=dark] .btn:not(.ghost):not(.orange){background:#2F6FE8}
+html[data-theme=dark] .logo img{background:#fff;border-radius:12px;padding:6px 8px}
+html[data-theme=dark] .logo .logo-icon{padding:4px}
+html[data-theme=dark] .sb .done span{color:#2B1300}
+html[data-theme=dark] ::placeholder{color:#7D8EB2}
+
+/* theme switch in the sidebar */
+.themeseg{margin-top:auto;display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.themeseg+.side{margin-top:10px;padding-top:0}
+.themeseg button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-height:34px;border:0;border-radius:9px;background:none;color:var(--muted);font:600 12px Inter,sans-serif;cursor:pointer}
+.themeseg button:hover{color:var(--ink)}
+.themeseg button.on{background:var(--card);color:var(--brand);box-shadow:0 1px 4px var(--shadow)}
+@media(max-width:1000px){.themeseg button span{display:none}}
+@media(max-width:820px){.themeseg{flex-direction:column;margin-top:auto}.themeseg+.side{display:none}}
+
+/* sidebar stays on screen so the theme switch, streak and Log out are always reachable */
+.app>nav{position:sticky;top:0;height:100vh;align-self:flex-start;overflow-y:auto;overscroll-behavior:contain}

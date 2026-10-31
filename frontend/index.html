@@ -9,6 +9,7 @@
 </head>
 <body>
   <div class="bg"></div>
+  <canvas class="sky" id="sky" aria-hidden="true"></canvas>
   <div class="guides"><i></i><i></i></div>
 
   <div class="page">
@@ -109,7 +110,8 @@
 
   <!-- shown after the white screen: question + flying plane + two buttons -->
   <section class="choose" id="choose">
-    <h2 class="ask">What brings you here today?<small>Choose your path to begin</small></h2>
+    <canvas class="sky-choose" id="skyChoose" aria-hidden="true"></canvas>
+    <h2 class="ask">What brings you here today?<small>Choose your path </small></h2>
     <!-- plane image: put your file next to this page (plane.png) -->
     <img class="plane" src="assets/plane.png" alt="">
     <div class="roles">
@@ -120,5 +122,7 @@
   </section>
 
   <script src="script.js"></script>
+  <script src="constellation.js"></script>
+  <script src="typewriter.js"></script>
 </body>
 </html>

@@ -1,9 +1,8 @@
 import { pool, withTx, query } from '../db/pool.js';
 import { AppError } from '../lib/errors.js';
 import { bus } from '../lib/events.js';
-import { quoteFor, assertMinutes } from '../lib/price.js';
+import { priceFor, assertMinutes } from '../lib/price.js';
 import * as ledger from './ledger.js';
-import * as notes from './notes.js';
 
 const REQUEST_TTL_MIN = Number(process.env.REQUEST_TTL_MIN || 30);
 const ACCEPTED_TTL_MIN = Number(process.env.ACCEPTED_TTL_MIN || 60);
@@ -65,7 +64,7 @@ export async function createRequest({
 }) {
   if (learnerId === mentorId) throw new AppError(400, 'SELF_SESSION');
   assertMinutes('booked', minutes);
-  const { tutorCredits, studentCredits: credits, feeCredits } = quoteFor(minutes);
+  const credits = priceFor(minutes);
 
   const session = await withTx(async (c) => {
     const { rows: users } = await c.query('SELECT id, level FROM users WHERE id = ANY($1)', [[learnerId, mentorId]]);
@@ -87,11 +86,10 @@ export async function createRequest({
     }
     const { rows } = await c.query(
       `INSERT INTO sessions (learner_id, mentor_id, type, status, title, problem_text, tags,
-                             difficulty, minutes, credits, tutor_credits, fee_credits, slot_id, expires_at)
-       VALUES ($1,$2,'booked','requested',$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(mins => $12::int))
+                             difficulty, minutes, credits, slot_id, expires_at)
+       VALUES ($1,$2,'booked','requested',$3,$4,$5,$6,$7,$8,$9, now() + make_interval(mins => $10::int))
        RETURNING *`,
-      [learnerId, mentorId, title, problemText, tags, difficulty, minutes, credits, tutorCredits, feeCredits,
-        slotId, REQUEST_TTL_MIN]
+      [learnerId, mentorId, title, problemText, tags, difficulty, minutes, credits, slotId, REQUEST_TTL_MIN]
     );
     return rows[0];
   });
@@ -180,19 +178,9 @@ export async function complete(sessionId, mentorId) {
     const held = await ledger.getHeldAmount(c, 'session', s.id);
     if (held <= 0) throw new AppError(500, 'NO_HOLD_FOUND');
 
-    // Split the escrow: the tutor gets exactly the price they set, the website keeps the rest (the 5%).
-    // Sessions created before the fee existed have no tutor_credits and pay out in full.
-    const tutorShare = s.tutor_credits ?? held;
-    const fee = held - tutorShare;
-    if (tutorShare <= 0 || fee < 0) throw new AppError(500, 'BAD_PRICE_SPLIT');
     await ledger.credit(c, {
-      userId: s.mentor_id, amount: tutorShare, reason: 'payout', refType: 'session', refId: s.id,
+      userId: s.mentor_id, amount: held, reason: 'payout', refType: 'session', refId: s.id,
     });
-    if (fee > 0) {
-      await ledger.credit(c, {
-        userId: await ledger.getPlatformUserId(c), amount: fee, reason: 'fee', refType: 'session', refId: s.id,
-      });
-    }
     const { rows } = await c.query(
       "UPDATE sessions SET status = 'completed', ended_at = now(), settled_at = now() WHERE id = $1 RETURNING *",
       [s.id]
@@ -200,11 +188,7 @@ export async function complete(sessionId, mentorId) {
     await c.query(LEVEL_UP_SQL, [s.mentor_id]);
     return { session: rows[0], changed: true };
   });
-  if (changed) {
-    publish(session, [session.mentor_id, session.learner_id]);
-    // The notes PDF is made after the money has moved, so a PDF problem can never hold up the tutor's payout.
-    notes.finalize(session.id).catch((e) => console.error('notes pdf failed', e));
-  }
+  if (changed) publish(session, [session.mentor_id, session.learner_id]);
   return session;
 }
 
@@ -217,8 +201,7 @@ export async function getForUser(sessionId, userId) {
 
 export async function listForUser(userId) {
   const { rows } = await query(
-    `SELECT s.*, EXISTS (SELECT 1 FROM lesson_notes n WHERE n.session_id = s.id AND n.pdf IS NOT NULL) AS has_notes
-       FROM sessions s WHERE s.learner_id = $1 OR s.mentor_id = $1 ORDER BY s.created_at DESC LIMIT 100`,
+    'SELECT * FROM sessions WHERE learner_id = $1 OR mentor_id = $1 ORDER BY created_at DESC LIMIT 100',
     [userId]
   );
   return rows;

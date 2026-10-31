@@ -15,7 +15,7 @@ router.get('/', ah(async (req, res) => {
        FROM users u
        LEFT JOIN user_skills us ON us.user_id = u.id
        LEFT JOIN skills s ON s.id = us.skill_id
-      WHERE u.is_platform = false AND u.id <> $1
+      WHERE u.id <> $1
         AND u.level > (SELECT level FROM users WHERE id = $1)
       GROUP BY u.id ORDER BY u.level DESC, u.rating_avg DESC LIMIT 100`, [req.userId]
   );

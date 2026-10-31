@@ -9,11 +9,7 @@
     "db:migrate": "node db/migrate.js",
     "db:reset": "node db/migrate.js --reset",
     "db:seed": "node db/seed.js",
-    "test:race": "node scripts/race-test.js",
-    "test:unit": "node --test tests/*.test.js",
-    "test:money": "node scripts/money-test.js",
-    "test:notes": "node scripts/notes-test.js",
-    "daily:webhook": "node scripts/register-daily-webhook.js"
+    "test:race": "node scripts/race-test.js"
   },
   "engines": {
     "node": ">=18.11"
@@ -24,7 +20,6 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "pdfkit": "^0.20.2",
     "pg": "^8.12.0",
     "zod": "^3.23.8"
   }

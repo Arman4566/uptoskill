@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UpToSkill · Lessons</title><link rel="icon" href="assets/favicon.png">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared/money.css"></head>
-<body>
-<header class="top"><img src="assets/logo.png" alt="UpToSkill"><nav><a href="wallet.html">Wallet</a><a class="on" href="lessons.html">Lessons</a></nav><button class="link" id="out">Sign out</button></header>
-<main id="app"></main><div id="toast"></div><div class="ov" id="ov" hidden><div class="mod" id="mod"></div></div>
-<script src="shared/config.js"></script><script src="shared/api.js"></script><script src="lessons.js"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lessons · UpToSkill</title><link rel="icon" href="assets/favicon.png">
+<link rel="stylesheet" href="lessons.css"></head>
+<body data-back-fallback="index.html">
+<header class="bar"><span style="width:90px"></span><b>UpToSkill</b><span class="sp"></span><button class="btn ghost" id="out">Log out</button></header>
+<main id="app"><p class="mut">Loading...</p></main>
+<div class="ov" id="ov" hidden><div class="modal" id="mod"></div></div>
+<script src="api.js"></script><script src="shared/back.js"></script><script src="lessons.js"></script>
 </body></html>

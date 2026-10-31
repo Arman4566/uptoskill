@@ -1,47 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Student login · UpToSkill</title>
 <link rel="icon" href="../assets/favicon.png">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../auth/auth.css">
-<style>
-body{--panel:#0F1B3D;--glow:radial-gradient(circle at 20% 15%,rgba(56,130,255,.55),transparent 55%),radial-gradient(circle at 90% 90%,rgba(255,154,77,.35),transparent 50%);--mark:#6aa4ff;--accent:#1D4ED8;--accent-dark:#1D4ED8;--accent-soft:#EAF2FF;--on-accent:#fff;--ring:rgba(29,78,216,.18);--bg:#F4F8FF;}
-</style>
+<script src="../auth/prefs.js"></script>
 </head>
-<body data-role="student" data-next="app.html" data-other="../tutor/login.html">
-<aside class="brand">
-  <a class="home" href="../index.html">&larr; Back to home</a>
-  <div>
-    <div class="mark"><img src="../assets/logo-icon.png" alt=""><span>UpTo<b>Skill</b></span></div>
-    <h1>Get unstuck. Skill up faster.</h1>
-    <p class="lead">Book a mentor for a quick doubt or a deep-dive session, pay with credits and keep your learning streak alive.</p>
-    <ul class="perks"><li><i>&#10003;</i><span>Find mentors by skill, language and time</span></li><li><i>&#10003;</i><span>Instant Help when you are stuck right now</span></li><li><i>&#10003;</i><span>Doubt Board, streaks and badges</span></li><li><i>&#10003;</i><span>Credits held safely until your session is done</span></li></ul>
+<body class="student" data-role="student" data-next="app.html" data-other="../tutor/login.html">
+
+<svg class="waves" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+  <path class="w1" d="M0 0h560c-120 150-90 320-230 430C210 560 90 520 0 600z"/>
+  <path class="w1" d="M1440 120c-140 40-250 150-280 290s-150 250-310 300-250 120-250 190h840z" opacity=".55"/>
+  <path class="w2" d="M1440 470c-170 20-300 140-380 270-60 100-170 160-300 160h680z" opacity=".8"/>
+  <path class="w3" d="M1440 650c-130 10-230 90-300 170-40 45-100 80-170 80h470z"/>
+  <path class="w2" d="M0 900V690c110-40 250-20 350 60 60 48 130 90 210 90z" opacity=".55"/>
+</svg>
+<div class="dots a" aria-hidden="true"></div><div class="dots b" aria-hidden="true"></div>
+
+<header class="top">
+  <a class="mark" href="../index.html" aria-label="UpToSkill home">
+    <img src="../assets/logo-icon.png" alt="">
+    <span><b>UpTo<i>Skill</i></b><small data-i18n="tagline">Learn • Teach • Grow</small></span>
+  </a>
+  <div class="ctrls">
+    <div class="dd" id="langDD">
+      <button type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>
+        <span id="langName">English</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="menu" id="langMenu" role="menu">
+        <button type="button" role="menuitemradio" data-v="en"><span>English</span><svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+        <button type="button" role="menuitemradio" data-v="hi"><span>हिन्दी</span><svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+      </div>
+    </div>
+    <div class="dd" id="themeDD">
+      <button type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Theme">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <span id="themeName">Light</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="menu" id="themeMenu" role="menu">
+        <button type="button" role="menuitemradio" data-v="light"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span>Light</span><svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+        <button type="button" role="menuitemradio" data-v="dark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><span>Dark</span><svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+        <button type="button" role="menuitemradio" data-v="system"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span>System</span><svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+      </div>
+    </div>
   </div>
-  <small>&copy; UpToSkill &middot; Learn together, grow together.</small>
-  <img class="plane" src="../assets/plane.png" alt="">
-</aside>
+</header>
 
-<main class="formside">
+<main class="stage">
   <div class="box">
-    <span class="badge">Student</span>
-    <h2 id="title" data-login="Welcome back, learner" data-signup="Start learning today">Welcome back, learner</h2>
-    <p class="sub">Log in to continue your learning journey.</p>
+    <span class="badge" data-i18n="s_badge">Student</span>
+    <h2 id="title">Welcome back, learner</h2>
+    <p class="sub" id="sub">Log in to continue your learning journey.</p>
 
-    <div class="tabs" role="tablist"><button type="button" class="on" data-mode="login">Log in</button><button type="button" data-mode="signup">Sign up</button></div>
+    <div class="tabs" role="tablist"><button type="button" class="on" data-mode="login" data-i18n="login">Log in</button><button type="button" data-mode="signup" data-i18n="signup">Sign up</button></div>
 
     <form id="f" novalidate>
       <div class="err" id="err" role="alert" hidden></div>
-      <label data-only="signup" hidden>Full name<input class="in" id="name" autocomplete="name" placeholder="Your name"></label>
-      <label>Email<input class="in" id="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
-      <label>Password<span class="pw"><input class="in" id="password" type="password" placeholder="At least 8 characters" required><button type="button" id="toggle">Show</button></span></label>
+      <label data-only="signup" hidden><span data-i18n="name">Full name</span>
+        <span class="field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input class="in" id="name" autocomplete="name" data-i18n-ph="s_name_ph" placeholder="Your name"></span></label>
+      <label><span data-i18n="email">Email</span>
+        <span class="field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><input class="in" id="email" type="email" autocomplete="email" data-i18n-ph="email_ph" placeholder="you@example.com" required></span></label>
+      <label><span data-i18n="password">Password</span>
+        <span class="field pw"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><input class="in" id="password" type="password" data-i18n-ph="pw_ph" placeholder="At least 8 characters" required><button type="button" class="tg" id="toggle">Show</button></span></label>
       <button class="go" id="go" type="submit">Log in</button>
     </form>
 
-    <div class="demo"><span>Demo account: <b>student@demo.com</b> / <b>demo1234</b></span><button type="button" id="fill" data-email="student@demo.com">Fill in</button></div>
-    <p class="switch">Want to teach instead? <a href="../tutor/login.html">Go to tutor login</a></p>
+    <div class="demo"><span><span data-i18n="demo">Demo account:</span> <b>student@demo.com</b> / <b>demo1234</b></span><button type="button" id="fill" data-email="student@demo.com" data-i18n="fill">Fill in</button></div>
+    <p class="switch"><span data-i18n="s_switch">Want to teach instead?</span> <a href="../tutor/login.html" data-i18n="s_switch_a">Go to tutor login</a></p>
+    <a class="home" href="../index.html" data-i18n="home">← Back to home</a>
   </div>
 </main>
 <script src="../auth/auth.js"></script>

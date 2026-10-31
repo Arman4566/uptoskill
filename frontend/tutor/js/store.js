@@ -13,6 +13,9 @@ const priceOf = (min, instant) => Math.min(MAXPRICE, (instant ? IPRICE : PRICE)[
 const LEVELS = [[1, "Newcomer"], [2, "Helper"], [3, "Mentor"], [4, "Guide"]];
 const LEVEL_RULES = { 2: [3, 0], 3: [10, 4.0], 4: [25, 4.5] };                      // [sessions given, rating]
 const BONUS_CAP = 3, INSTANT_WAIT = 60e3, REQ_TTL = 24 * HR;
+const RESCHEDULE_PCT = 2;                                                          // tutor pays 2% of the session credits each time he moves a lecture
+const reschedFee = credits => Math.round(credits * RESCHEDULE_PCT) / 100;
+const learnerEmail = id => id === "L1" ? "student@demo.com" : null;               // demo link: only Riya Verma has a real student login
 
 /* ---------- time helpers ---------- */
 const startOfDay = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -54,7 +57,7 @@ const user = id => id === "me" ? S.me : S.users[id] || { id, name: String(id).st
 const sess = id => S.sessions.find(s => s.id == id);
 
 /* ---------- ledger: balance is a query, every movement is a row ---------- */
-const bal = u => S.ledger.filter(r => r.uid === u).reduce((n, r) => n + r.delta, 0);
+const bal = u => Math.round(S.ledger.filter(r => r.uid === u).reduce((n, r) => n + r.delta, 0) * 100) / 100;   // 2 decimals: reschedule fee can be a fraction
 function addLedger(u, delta, reason, refType, refId, note, ts) {
   if (refId != null && S.ledger.some(r => r.uid === u && r.reason === reason && r.refType === refType && r.refId === refId)) return null; // unique index: settles once
   const r = { id: S.nid++, uid: u, delta, reason, refType: refType || null, refId: refId ?? null, note: note || "", ts: ts || Date.now() };
@@ -114,6 +117,22 @@ const Sess = {
     return good();
   },
   decline(id) { const s = sess(id); if (!s || s.status !== "requested") return fail("This request is no longer open."); s.status = "declined"; return good(); },
+  reschedule(id, ts, reason) {
+    const s = sess(id); if (!s || s.status !== "accepted") return fail("Only accepted sessions that have not started can be moved.");
+    if (!(ts > Date.now() + 5 * 6e4)) return fail("Pick a time at least 5 minutes from now.");
+    if (ts > Date.now() + 14 * DAY) return fail("You can move a session at most 14 days ahead.");
+    if (Math.abs(ts - s.slotTs) < 6e4) return fail("That is the same time the session already has.");
+    const clash = S.sessions.find(x => x.id !== s.id && ["accepted", "in_progress"].includes(x.status) && ts < x.slotTs + x.minutes * 6e4 && ts + s.minutes * 6e4 > x.slotTs);
+    if (clash) return fail(`That overlaps your session "${clash.title}" (${when(clash.slotTs)}).`);
+    if ((s.reschedules || []).length >= 3) return fail("A session can be moved at most 3 times.");
+    const fee = reschedFee(s.credits); if (bal("me") < fee) return fail("Not enough credits to pay the reschedule fee.");
+    s.reschedules = s.reschedules || []; const key = s.id + ":r" + (s.reschedules.length + 1), from = s.slotTs;
+    addLedger("me", -fee, "reschedule_fee", "reschedule", key, `Reschedule fee ${RESCHEDULE_PCT}%: ` + s.title);
+    addLedger("platform", fee, "platform_fee", "reschedule", key, "Reschedule fee (simulated)");
+    const sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; }   // old slot is free again
+    s.slotId = null; s.slotTs = ts; s.reschedules.push({ from, to: ts, reason: reason || "", fee, ts: Date.now() });
+    return { ok: true, fee, from };
+  },
   start(id) { const s = sess(id); if (!s) return fail("Session not found."); if (s.status === "in_progress") return good(); if (s.status !== "accepted") return fail("Session cannot start from status " + s.status + "."); s.status = "in_progress"; s.startTs = Date.now(); return good(); },
   release(s, status) {
     addLedger(s.learnerId, s.credits, "release", "session", s.id, "Released: " + s.title);
@@ -159,12 +178,6 @@ function acceptBounty(b, answerId) {
 function refundBounty(b) {
   if (b.status !== "open") return;
   b.status = "expired"; addLedger(b.authorId, b.reward, "bounty_refund", "bounty", b.id, "Refund: " + b.title);
-}
-function postBounty(title, tags, reward) {
-  if (bal("me") < reward) return fail("Not enough credits for that reward.");
-  const b = { id: S.nid++, authorId: "me", title, tags, reward, status: "open", deadline: Date.now() + DAY, answers: [], ts: Date.now(), simAt: [Date.now() + 9000, Date.now() + 20000] };
-  addLedger("me", -reward, "bounty_hold", "bounty", b.id, "Escrow: " + title);
-  S.bounties.unshift(b); return { ok: true, b };
 }
 
 /* ---------- room storage (separate key so two windows never overwrite each other) ---------- */

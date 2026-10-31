@@ -1,7 +1,8 @@
-/* Drives student/login.html and tutor/login.html. The role comes from <body data-role>, the destination from data-next. */
+/* Drives student/login.html and tutor/login.html. Role comes from <body data-role>, destination from data-next.
+   Text comes from prefs.js (English / Hindi); this file only switches between "log in" and "sign up". */
 (function () {
   const role = document.body.dataset.role, next = document.body.dataset.next, other = document.body.dataset.other;
-  const $ = s => document.querySelector(s);
+  const $ = s => document.querySelector(s), tr = k => UTSPrefs.t(k), pre = role === "tutor" ? "t_" : "s_";
   const form = $("#f"), err = $("#err"), go = $("#go");
   let mode = "login";
 
@@ -12,21 +13,24 @@
   const showErr = (m, html) => { err.hidden = false; err.classList.add("on"); err[html ? "innerHTML" : "textContent"] = m; };
   const clearErr = () => { err.classList.remove("on"); err.textContent = ""; };
 
+  function paint() {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
+    document.querySelectorAll("[data-only]").forEach(e => e.hidden = e.dataset.only !== mode);
+    $("#title").textContent = tr(pre + "t_" + mode);
+    $("#sub").textContent = tr(pre + "sub_" + mode);
+    go.textContent = tr(mode === "login" ? "login" : "create");
+    const tg = $("#toggle"); tg.textContent = tr($("#password").type === "password" ? "show" : "hide");
+  }
   function setMode(m) {
     mode = m; clearErr();
-    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
-    document.querySelectorAll("[data-only]").forEach(e => e.hidden = e.dataset.only !== m);
-    $("#title").textContent = m === "login" ? $("#title").dataset.login : $("#title").dataset.signup;
-    go.textContent = m === "login" ? "Log in" : "Create account";
     $("#password").autocomplete = m === "login" ? "current-password" : "new-password";
     document.querySelectorAll("[data-only=signup] input").forEach(i => i.required = m === "signup");
+    paint();
   }
   document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+  document.addEventListener("uts-lang", paint);
 
-  $("#toggle").onclick = e => {
-    const p = $("#password"), show = p.type === "password";
-    p.type = show ? "text" : "password"; e.target.textContent = show ? "Hide" : "Show";
-  };
+  $("#toggle").onclick = () => { const p = $("#password"); p.type = p.type === "password" ? "text" : "password"; paint(); };
   const fill = $("#fill");
   if (fill) fill.onclick = () => { setMode("login"); $("#email").value = fill.dataset.email; $("#password").value = "demo1234"; };
 
@@ -38,7 +42,7 @@
       else await UTSAuth.login(d);
       location.href = next;
     } catch (e) {
-      if (e.code === "role") showErr(`${e.message} <a href="${other}">Go to the other login</a>`, true);
+      if (e.code === "role") showErr(`${e.message} <a href="${other}">${tr(pre + "switch_a")}</a>`, true);
       else showErr(e.message);
       go.disabled = false;
     }
