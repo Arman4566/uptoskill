@@ -2,7 +2,7 @@
 // - Local development: leave blank. Pages on localhost / 127.0.0.1 / file:// use http://localhost:4000 automatically.
 // - Frontend and backend on the same public origin: leave blank.
 // - Different Render URLs: set it, e.g. 'https://your-backend.onrender.com' (no trailing slash).
-window.UPTOSKILL_API_URL = '';
+window.UPTOSKILL_API_URL = 'https://uptoskill-backend.onrender.com';
 (function () {
   try {
     if (window.UPTOSKILL_API_URL) return;

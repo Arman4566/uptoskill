@@ -17,12 +17,19 @@
   async function call(path, body) {
     let res;
     try {
-      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 60000);
       try { res = await fetch(API_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal }); }
       finally { clearTimeout(timer); }
     } catch (e) { throw fail("NETWORK", "Cannot reach the server at " + API_BASE); }
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return data;
+    if (res.ok) {
+      // A real UpToSkill backend always answers sign-up / log-in with { user, token }. Anything else on this
+      // address (an old server, another program on port 4000) must not be mistaken for a successful sign-in.
+      if (path.startsWith("/auth/") && !(data && data.user && data.token)) {
+        throw fail("BAD_SERVER", "The program answering at " + API_BASE + " is not the UpToSkill backend (it replied without an account). Stop whatever is using that port, then start the backend with npm start in the backend folder.");
+      }
+      return data;
+    }
     throw Object.assign(fail(data.error || "ERROR", data.message || "Something went wrong. Please try again."), { status: res.status, details: data.details });
   }
 
