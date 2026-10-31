@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
   user_id    INT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   delta      INT  NOT NULL CHECK (delta <> 0),
   reason     TEXT NOT NULL CHECK (reason IN ('starter','hold','release','payout','bonus',
-                                             'bounty_hold','bounty_payout','bounty_refund')),
+                                             'bounty_hold','bounty_payout','bounty_refund','quiz_reward')),
   ref_type   TEXT NOT NULL,
   ref_id     INT  NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -194,3 +194,59 @@ CREATE TABLE IF NOT EXISTS tutor_videos (
   data       BYTEA NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------------------------
+-- Quizzes after a lesson (questions written by Grok, graded here), AI reports for tutors, tutors' short videos.
+-- ---------------------------------------------------------------------------------------------
+
+-- Databases made before quizzes existed: let the credit ledger accept the new "quiz_reward" reason.
+ALTER TABLE credit_ledger DROP CONSTRAINT IF EXISTS credit_ledger_reason_check;
+ALTER TABLE credit_ledger ADD CONSTRAINT credit_ledger_reason_check CHECK (reason IN
+  ('starter','hold','release','payout','bonus','bounty_hold','bounty_payout','bounty_refund','quiz_reward'));
+
+CREATE TABLE IF NOT EXISTS quizzes (
+  id              SERIAL PRIMARY KEY,
+  student_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tutor_id        INT REFERENCES users(id) ON DELETE SET NULL,
+  session_ref     TEXT NOT NULL,                       -- the lesson this quiz belongs to (one quiz per lesson per student)
+  topic           TEXT NOT NULL,
+  session_title   TEXT NOT NULL DEFAULT '',
+  questions       JSONB NOT NULL,                      -- includes the right answers: never sent to the browser before submit
+  status          TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','graded')),
+  answers         JSONB,
+  score           INT,
+  total           INT,
+  credits_awarded INT NOT NULL DEFAULT 0,
+  review          JSONB,
+  analysis        JSONB,                               -- Grok's explanation for the student (only when the score was low)
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  graded_at       TIMESTAMPTZ,
+  UNIQUE (student_id, session_ref)
+);
+CREATE INDEX IF NOT EXISTS idx_quizzes_student ON quizzes (student_id, created_at DESC);
+
+-- The AI's report about a student, delivered to the tutor who taught the lesson.
+CREATE TABLE IF NOT EXISTS student_reports (
+  id         SERIAL PRIMARY KEY,
+  student_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tutor_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  quiz_id    INT NOT NULL UNIQUE REFERENCES quizzes(id) ON DELETE CASCADE,
+  data       JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_reports_tutor ON student_reports (tutor_id, created_at DESC);
+
+-- A short video a tutor records to explain a weak topic to one student.
+CREATE TABLE IF NOT EXISTS remedial_videos (
+  id         SERIAL PRIMARY KEY,
+  report_id  INT REFERENCES student_reports(id) ON DELETE CASCADE,
+  tutor_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  student_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  topic      TEXT NOT NULL,
+  note       TEXT NOT NULL DEFAULT '',
+  mime       TEXT NOT NULL,
+  data       BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_videos_student ON remedial_videos (student_id, created_at DESC);

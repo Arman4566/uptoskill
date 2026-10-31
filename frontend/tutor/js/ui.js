@@ -77,7 +77,7 @@ const FILE = {
 };
 
 
-let page = "dashboard", arg = null;
+let page = "dashboard", arg = null, quizUnread = 0;
 const T = { sess: "upcoming", board: "open", earn: "month", lf: "all", bq: "", bt: "Any", openReq: {} };
 let learnerMode = false, roomTimers = [];
 
@@ -97,7 +97,7 @@ const reqCount = () => S.sessions.filter(s => s.status === "requested").length;
 const instOpen = () => S.instant.filter(r => r.status === "open" && !r.skipped);
 function menu() {
   return [["dashboard", "Dashboard", "grid"], ["requests", "Session Requests", "inbox", reqCount()], ["messages", "Messages", "chat", unreadMsgs()], ["sessions", "My Sessions", "cal"], ["availability", "Availability", "clock"],
-    ["instant", "Instant Help", "bolt", S.me.online ? instOpen().length : 0], ["board", "Doubt Board", "help"], ["earnings", "Earnings", "wallet"], ["reviews", "Reviews", "star"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
+    ["instant", "Instant Help", "bolt", S.me.online ? instOpen().length : 0], ["board", "Doubt Board", "help"], ["earnings", "Earnings", "wallet"], ["reports", "Student Reports", "bar", quizUnread], ["reviews", "Reviews", "star"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
 }
 function levelCard() {
   const n = given().length, r = avgRating(), l = S.me.level, nx = LEVEL_RULES[l + 1];
@@ -120,7 +120,7 @@ function go(id, a, keep) {
 }
 function refresh() {
   const ae = document.activeElement, typing = ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName);
-  renderNav(); if (page === "room" || !$("#modal").hidden || typing) return;
+  renderNav(); if (page === "room" || page === "reports" || !$("#modal").hidden || typing) return;
   go(page, arg, true);
 }
 
@@ -220,6 +220,7 @@ const PAGES = {
       <section class="sec"><div class="sec-head"><h2>${icon("book")} Credit ledger</h2><select class="in" data-chg="lf" aria-label="Filter ledger"><option value="all" ${T.lf === "all" ? "selected" : ""}>All movements</option><option value="earn" ${T.lf === "earn" ? "selected" : ""}>Earnings only</option><option value="other" ${T.lf === "other" ? "selected" : ""}>Escrow and other</option></select></div>
       <div class="card" style="overflow-x:auto"><table><tr><th>When</th><th>Details</th><th>Type</th><th>Credits</th></tr>${rows.slice(0, 60).map(l => `<tr><td>${new Date(l.ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}, ${clock(l.ts)}</td><td>${esc(l.note)}</td><td><span class="chip ${EARN.includes(l.reason) ? "g" : "n"}">${R[l.reason] || l.reason}</span></td><td class="${l.delta > 0 ? "pos" : "neg"}">${l.delta > 0 ? "+" : ""}${l.delta}</td></tr>`).join("")}</table></div><p class="mut">Showing ${Math.min(60, rows.length)} of ${rows.length} rows. Balance is always the sum of these rows.</p></section>`;
   },
+  reports() { return head("Student Reports", "After a student scores low on a quiz, the AI writes a report about their weak topics. Teach them in your next lesson, or send a short video.") + `<div id="qrpage" style="display:flex;flex-direction:column;gap:14px"></div>`; },
   reviews() {
     const rs = S.ratings.slice().sort((a, b) => b.ts - a.ts), avg = avgRating(), dist = [5, 4, 3, 2, 1].map(n => [n, rs.filter(r => r.stars === n).length]);
     const by = {}; rs.forEach(r => { const t = (sess(r.sid)?.tags || ["Other"])[0]; (by[t] = by[t] || []).push(r.stars); });
@@ -276,7 +277,7 @@ function drawBoard() {
   const q = T.bq.trim().toLowerCase(), f = b => (T.board === "mine" ? b.answers.some(a => a.helperId === "me") : b.status === T.board) && (!q || (b.title + b.tags.join(" ")).toLowerCase().includes(q)) && (T.bt === "Any" || b.tags.includes(T.bt));
   const l = S.bounties.filter(f); $("#blist").innerHTML = l.length ? l.map(boardCard).join("") : empty("Nothing here", T.board === "open" ? "No open doubts match your filters." : "No bounties in this tab yet.");
 }
-const AFTER = { messages() { UTSShared.tutorThreads(MYMAIL).forEach(c => { if (c.unread) UTSShared.chatSeen(c.id, "tutor"); }); renderNav(); $$(".msgs").forEach(m => m.scrollTop = m.scrollHeight); }, board: drawBoard, profile: loadMyVideo, earnings() { const b = $("#cbox"); if (b) bindChart(b, series(T.earn)); }, room(id) { if (sess(id)) initRoom(id, "tutor"); } };
+const AFTER = { reports() { if (window.UTSQuiz) UTSQuiz.tutorPage($("#qrpage"), n => { quizUnread = n; renderNav(); }); }, messages() { UTSShared.tutorThreads(MYMAIL).forEach(c => { if (c.unread) UTSShared.chatSeen(c.id, "tutor"); }); renderNav(); $$(".msgs").forEach(m => m.scrollTop = m.scrollHeight); }, board: drawBoard, profile: loadMyVideo, earnings() { const b = $("#cbox"); if (b) bindChart(b, series(T.earn)); }, room(id) { if (sess(id)) initRoom(id, "tutor"); } };
 
 /* ---------- live room (works in two browser windows through localStorage events) ---------- */
 function drawRoom(id, who) {
@@ -497,5 +498,6 @@ window.addEventListener("uts-change", () => { if (!learnerMode) refresh(); });
   const q = new URLSearchParams(location.search);
   if (q.get("as") === "learner" && q.get("room")) { learnerMode = true; return learnerView(q.get("room"), q.get("t")); }
   const h = location.hash.slice(1).split("/"), start = PAGES[h[0]] && h[0] !== "room" ? h[0] : "dashboard"; syncPublic(); go(start); checkStudentNotifs();
+  if (window.UTSQuiz) UTSQuiz.pollTutor(n => { const more = n > quizUnread; quizUnread = n; renderNav(); if (more && page !== "reports") toast(`New AI report about a student (${n} unread). Open Student Reports.`); });
   setInterval(tick, 1000);
 })();

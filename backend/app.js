@@ -9,6 +9,7 @@ import slotRoutes from './routes/slots.js';
 import stateRoutes from './routes/state.js';
 import { query } from './db/pool.js';
 import { corsOrigin } from './lib/cors.js';
+import quizRoutes from './routes/quiz.js';
 import virtualRoomRoutes from './routes/virtual-room.js';
 import { errorHandler } from './middleware/error.js';
 
@@ -28,6 +29,7 @@ app.use('/sessions', sessionRoutes);
 app.use('/mentors', mentorRoutes);
 app.use('/slots', slotRoutes);
 app.use('/state', stateRoutes);
+app.use('/quiz', quizRoutes);
 app.use('/virtual-room', virtualRoomRoutes);
 
 app.use(errorHandler);

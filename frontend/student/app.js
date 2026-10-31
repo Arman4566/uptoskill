@@ -74,7 +74,7 @@ const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const log = (t, a) => S.ledger.unshift({ d: "Today", t, a });
 const escrow = () => S.sessions.filter(s => s.status === "requested" || s.status === "accepted").reduce((n, s) => n + s.credits, 0);
 const F = { q: "", lang: "Any", slot: "Any" };
-let page = "dashboard", tab = "upcoming";
+let page = "dashboard", tab = "upcoming", quizNew = 0;
 
 function toast(m) { const t = $("#toast"); t.textContent = m; t.className = "on"; clearTimeout(toast.h); toast.h = setTimeout(() => t.className = "", 2400); }
 function modal(h) { $("#modal").innerHTML = `<div class="mod">${h}</div>`; $("#modal").hidden = false; }
@@ -101,6 +101,7 @@ const P = {
   cap: '<path d="M22 10L12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>',
   chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.3L4 21l1.5-4.5A8.4 8.4 0 1 1 21 11.5z"/>',
   send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
+  quiz: '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>'
 };
 const icon = (n, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${P[n]}</svg>`;
@@ -129,7 +130,7 @@ function streakHTML() {
 }
 function menu() {
   const m = [["dashboard", "Dashboard", "grid"], ["find", "Find Mentors", "search"], ["sessions", "My Sessions", "cal"], ["instant", "Instant Help", "bolt"],
-    ["board", "Doubt Board", "help"], ["ledger", "Credits & Ledger", "wallet"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
+    ["quizzes", "Quizzes" + (quizNew ? ` (${quizNew})` : ""), "quiz"], ["board", "Doubt Board", "help"], ["ledger", "Credits & Ledger", "wallet"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
   if (S.user.mentor) m.splice(3, 0, ["requests", `Session Requests (${S.incoming.length})`, "inbox"]);
   return m;
 }
@@ -144,6 +145,7 @@ function go(id) {
   page = id; if (window.UTSBack) UTSBack.note(id); renderNav();
   $("#main").innerHTML = PAGES[id]();
   if (id === "dashboard" || id === "find") updateTutors();
+  if (id === "quizzes" && window.UTSQuiz) UTSQuiz.studentPage($("#quizpage")).then(() => { quizNew = 0; renderNav(); });
   window.scrollTo(0, 0);
 }
 
@@ -175,7 +177,8 @@ function sessionHTML(l) {
   const open = l.status === "accepted" || l.status === "requested", can = open && !delayBlock(l), dl = (l.delays || []).length;
   const delayBtn = can ? `<button class="btn ghost" data-act="delay" data-id="${l.id}">${icon("clock", 18)} Delay</button>` : "";
   const btn = l.status === "accepted" ? `<button class="btn" data-act="join" data-id="${l.id}">${icon("video", 18)} Join room</button>${delayBtn}<button class="btn ghost" data-act="cancel" data-id="${l.id}">Cancel</button>`
-    : l.status === "requested" ? `${delayBtn}<button class="btn ghost" data-act="cancel" data-id="${l.id}">Cancel request</button>` : "";
+    : l.status === "requested" ? `${delayBtn}<button class="btn ghost" data-act="cancel" data-id="${l.id}">Cancel request</button>`
+    : l.status === "completed" ? `<button class="btn orange" data-act="quiz" data-id="${l.id}">${icon("quiz", 18)} Take quiz</button>` : "";
   return `<div class="card lec" ${open ? `data-lift="session:${l.id}"` : ""}><div class="when"><small>${l.day}</small><b>${l.time}</b></div><div class="info"><div class="t">${esc(l.title)}</div>
     <div class="w">with ${l.mentor} · ${l.skill} · Level ${l.level}</div>
     <div class="m"><span class="chip">${l.min} min</span><span class="chip o">${l.credits} credits${l.status === "completed" ? " paid" : l.status === "cancelled" ? " refunded" : " held"}</span><span class="chip ${st[0]}">${st[1]}</span>${dl ? `<span class="chip o">Delayed ×${dl}</span>` : ""}</div></div>${btn}${open ? `<button class="btn ghost" data-act="lift">Details</button>` : ""}</div>`;
@@ -202,6 +205,7 @@ const PAGES = {
       `<div class="tabs">${["upcoming", "past"].map(t => `<button class="btn ${tab === t ? "" : "ghost"}" data-act="tab" data-id="${t}">${t === "upcoming" ? "Upcoming" : "Past"}</button>`).join("")}</div>` +
       (list.length ? list.slice().reverse().map(sessionHTML).join("") : `<div class="empty"><b>Nothing here yet</b>Book a mentor from Find Mentors or use Instant Help.</div>`);
   },
+  quizzes() { return head("Quizzes", "Take a short AI quiz after each lesson, earn credits, and get help on weak topics.") + `<div id="quizpage"></div>`; },
   instant() {
     return head("Instant Help", "Get matched with a mentor right now. 15 minutes costs 2 credits.") +
       `<div class="card pad"><label class="f">What are you stuck on?<input class="in" id="it" placeholder="e.g. React, SQL, Python"></label>
@@ -416,12 +420,14 @@ const ACT = {
     window.open("../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.user.name) + "&role=student" + (api ? "&api=" + encodeURIComponent(api) : ""), "_blank", "noopener");
     closeModal();
   },
+  quiz: id => { const s = S.sessions.find(x => x.id == id); if (s && s.status === "completed") UTSQuiz.start(s); },
   finish: (id, b) => {
     const s = S.sessions.find(x => x.id == id); if (!s || s.status !== "accepted") return toast("Only an accepted session can be finished.");
     s.status = "completed"; s.rating = +b.dataset.r;
     S.done++; S.mins += s.min; tick(); log(`Session with ${s.mentor}`, 0); save(); closeModal();
     if (s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "rating", ref: s.ref, stars: s.rating, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
     toast(`Session complete! Streak: ${S.streak.days} day${S.streak.days > 1 ? "s" : ""}`); tab = "past"; go("sessions");
+    if (window.UTSQuiz) UTSQuiz.offer(s);
   },
   instantgo: () => {
     const topic = $("#it").value.trim(); if (!topic) return toast("Tell us what you are stuck on");
@@ -498,5 +504,15 @@ window.addEventListener("storage", e => {
 });
 window.addEventListener("uts-theme", renderNav);
 
+/* ---------- AI quiz (shared/quiz.js) ---------- */
+if (window.UTSQuiz) {
+  S.quizPaid = S.quizPaid || [];
+  UTSQuiz.setHooks({ credits: (qid, n, label) => {          // the server already paid its ledger once; this keeps the app's balance in step, once per quiz
+    if (S.quizPaid.includes(qid)) return; S.quizPaid.push(qid); S.credits = round2(S.credits + n); log(label, n); save(); toast(`+${n} credit${n > 1 ? "s" : ""} for the quiz!`); renderNav();
+    if (page === "dashboard" || page === "ledger") go(page);
+  } });
+  const pollVideos = async () => { const n = await UTSQuiz.unseenVideos(); if (n !== quizNew && page !== "quizzes") { quizNew = n; renderNav(); } };
+  pollVideos(); setInterval(pollVideos, 60000);
+}
 go("dashboard");
 checkNotifs();

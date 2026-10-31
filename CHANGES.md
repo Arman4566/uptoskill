@@ -94,3 +94,10 @@ The update was built on an older snapshot (no mentors/slots routes, no `back.js`
 - Credits inside the student and tutor apps are still bookkeeping done in the browser (as before); only the Live Lessons part has a server-side ledger.
 - The old simulated "live room" in the tutor app still works only inside one browser; use the virtual classroom for real calls.
 - The `backend/.env` in the zip still holds real-looking secrets: rotate the database password, `JWT_SECRET` and LiveKit keys, and keep `.env` out of any zip you share.
+
+## Round 7 (AI quiz, weak-topic help, tutor reports, short videos)
+See `QUIZ_SETUP.md` for what it does and how to set it up.
+- Backend: Grok client (`services/grok.js`), quiz logic (`services/quiz.js`), routes under `/quiz`, new tables `quizzes`, `student_reports`, `remedial_videos`, new credit reason `quiz_reward`. No new npm packages.
+- Student app: "Take quiz" on finished lessons, an offer right after Finish, a new **Quizzes** page (history, videos from tutors, badge for new videos).
+- Tutor app: new **Student Reports** page (AI report per low-scoring student, repeat-miss counts, suggested plan, video outline, record/upload a short video) with an unread badge.
+- `backend/.env.example` re-added with placeholders (it was missing from the zip) and the Grok settings.
