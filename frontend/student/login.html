@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student login · UpToSkill</title>
+<link rel="icon" href="../assets/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../auth/auth.css">
+<style>
+body{--panel:#0F1B3D;--glow:radial-gradient(circle at 20% 15%,rgba(56,130,255,.55),transparent 55%),radial-gradient(circle at 90% 90%,rgba(255,154,77,.35),transparent 50%);--mark:#6aa4ff;--accent:#1D4ED8;--accent-dark:#1D4ED8;--accent-soft:#EAF2FF;--on-accent:#fff;--ring:rgba(29,78,216,.18);--bg:#F4F8FF;}
+</style>
+</head>
+<body data-role="student" data-next="app.html" data-other="../tutor/login.html">
+<aside class="brand">
+  <a class="home" href="../index.html">&larr; Back to home</a>
+  <div>
+    <div class="mark"><img src="../assets/logo-icon.png" alt=""><span>UpTo<b>Skill</b></span></div>
+    <h1>Get unstuck. Skill up faster.</h1>
+    <p class="lead">Book a mentor for a quick doubt or a deep-dive session, pay with credits and keep your learning streak alive.</p>
+    <ul class="perks"><li><i>&#10003;</i><span>Find mentors by skill, language and time</span></li><li><i>&#10003;</i><span>Instant Help when you are stuck right now</span></li><li><i>&#10003;</i><span>Doubt Board, streaks and badges</span></li><li><i>&#10003;</i><span>Credits held safely until your session is done</span></li></ul>
+  </div>
+  <small>&copy; UpToSkill &middot; Learn together, grow together.</small>
+  <img class="plane" src="../assets/plane.png" alt="">
+</aside>
+
+<main class="formside">
+  <div class="box">
+    <span class="badge">Student</span>
+    <h2 id="title" data-login="Welcome back, learner" data-signup="Start learning today">Welcome back, learner</h2>
+    <p class="sub">Log in to continue your learning journey.</p>
+
+    <div class="tabs" role="tablist"><button type="button" class="on" data-mode="login">Log in</button><button type="button" data-mode="signup">Sign up</button></div>
+
+    <form id="f" novalidate>
+      <div class="err" id="err" role="alert" hidden></div>
+      <label data-only="signup" hidden>Full name<input class="in" id="name" autocomplete="name" placeholder="Your name"></label>
+      <label>Email<input class="in" id="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+      <label>Password<span class="pw"><input class="in" id="password" type="password" placeholder="At least 8 characters" required><button type="button" id="toggle">Show</button></span></label>
+      <button class="go" id="go" type="submit">Log in</button>
+    </form>
+
+    <div class="demo"><span>Demo account: <b>student@demo.com</b> / <b>demo1234</b></span><button type="button" id="fill" data-email="student@demo.com">Fill in</button></div>
+    <p class="switch">Want to teach instead? <a href="../tutor/login.html">Go to tutor login</a></p>
+  </div>
+</main>
+<script src="../auth/auth.js"></script>
+<script src="../auth/login.js"></script>
+</body>
+</html>

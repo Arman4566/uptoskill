@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UpToSkill · Connect with peers and skill up</title>
+<link rel="icon" href="assets/favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="guides"><i></i><i></i></div>
+
+  <div class="page">
+    <header class="top">
+      <a class="brandlink" href="index.html" aria-label="UpToSkill home"><img src="assets/logo-icon.png" alt=""><span>UpTo<b>Skill</b></span></a>
+      <nav><a href="#solutions">Solutions</a><a href="#services">Services</a><a href="#pricing">Pricing</a></nav>
+      <div class="auth"><a class="login" href="student/login.html">Log in</a><a class="register" href="#register" id="registerBtn">Register</a></div>
+    </header>
+
+    <main>
+      <!-- the title is a "window". The picture is set in style.css (--window-image) -->
+      <h1 class="window-title">UpToSkill</h1>
+
+      <div class="pills"><span class="pill hot">Hot <b></b></span><span class="pill cold"><b></b> Cold</span></div>
+
+      <section class="row">
+        <div class="card">
+          <h2>Connect to<br>Skill up</h2>
+          <svg viewBox="0 0 200 90" fill="none"><path d="M0 65Q25 65 45 52T95 24T145 58T200 40" stroke="#bae6fd" stroke-width="2.2" stroke-linecap="round"/><circle cx="95" cy="24" r="4" fill="#fff" stroke="#38bdf8" stroke-width="2.5"/></svg>
+        </div>
+
+        <!-- teacher + student neon figures -->
+        <div class="center">
+          <div class="figures" id="figures">
+            <svg class="fig teacher" viewBox="0 0 300 400" aria-label="Teacher">
+              <circle cx="110" cy="70" r="22"/>
+              <path d="M110 95V210M110 210L80 330M110 210L140 330"/>
+              <path d="M110 120L80 190"/>
+              <path d="M110 120L200 150L285 175"/>
+              <path d="M285 175L293 168M285 175L295 175M285 175L293 182"/>
+            </svg>
+            <svg class="fig student" viewBox="0 0 300 400" aria-label="Student">
+              <circle cx="110" cy="150" r="18"/>
+              <path d="M110 168V260M110 260L85 330M110 260L135 330"/>
+              <path d="M110 190L85 245"/>
+              <path d="M110 190L200 168L285 175"/>
+              <path d="M285 175L293 168M285 175L295 175M285 175L293 182"/>
+            </svg>
+          </div>
+          <button class="start" id="startBtn">Start now</button>
+        </div>
+
+        <div class="card">
+          <h2>Find the perfect lead for you</h2>
+          <div class="scan"><span></span><span></span><span></span><span></span></div>
+        </div>
+      </section>
+
+      <section class="foot">
+        <p>Thousands of peers<br>to connect with</p>
+        <div class="about"><small>About</small>Connect with your peers<br><em>&amp;</em><br>Skill up</div>
+        <p class="right">We are proud of our<br>partners</p>
+      </section>
+    </main>
+  </div>
+
+
+  <div class="more">
+    <section id="solutions" class="blk">
+      <h2>How UpToSkill works</h2>
+      <p class="blead">Peer learning in three steps. No long courses, just the help you need, when you need it.</p>
+      <div class="grid3">
+        <article><i>1</i><h3>Ask or book</h3><p>Post a doubt, ask for Instant Help or book a mentor by skill, language and time.</p></article>
+        <article><i>2</i><h3>Learn live</h3><p>Join a live room with video, chat and a shared code editor. AI writes the session notes.</p></article>
+        <article><i>3</i><h3>Rate and grow</h3><p>Rate your mentor, keep your streak and earn badges. Mentors earn credits and level up.</p></article>
+      </div>
+    </section>
+
+    <section id="services" class="blk">
+      <h2>Choose your side</h2>
+      <p class="blead">One platform, two roles. Each has its own login and its own workspace.</p>
+      <div class="grid2">
+        <article class="side-card"><h3>For students</h3>
+          <ul><li>Find mentors for any skill</li><li>Instant Help and Doubt Board</li><li>Streaks, badges and leaderboard</li></ul>
+          <a class="cta" href="student/login.html">Student login</a></article>
+        <article class="side-card tutor"><h3>For tutors</h3>
+          <ul><li>Accept requests that fit your skills</li><li>Earnings graph, reviews and levels</li><li>Set your own availability</li></ul>
+          <a class="cta" href="tutor/login.html">Tutor login</a></article>
+      </div>
+    </section>
+
+    <section id="pricing" class="blk">
+      <h2>Simple credit pricing</h2>
+      <p class="blead">No subscriptions. Credits are held safely and only paid out when the session is completed.</p>
+      <div class="grid3 price">
+        <article><b>2</b><span>credits</span><p>15 minute quick help</p></article>
+        <article class="pop"><b>4</b><span>credits</span><p>30 minute session</p></article>
+        <article><b>6</b><span>credits</span><p>60 minute deep dive</p></article>
+      </div>
+      <p class="fine">New students get welcome credits. Prices come from a fixed table, never from AI.</p>
+    </section>
+
+    <footer class="ft"><span>&copy; UpToSkill</span><span><a href="student/login.html">Student login</a> &middot; <a href="tutor/login.html">Tutor login</a></span></footer>
+  </div>
+
+  <!-- white screen that expands from the button -->
+  <div class="flash" id="flash"></div>
+
+  <!-- shown after the white screen: question + flying plane + two buttons -->
+  <section class="choose" id="choose">
+    <h2 class="ask">What brings you here today?<small>Choose your path to begin</small></h2>
+    <!-- plane image: put your file next to this page (plane.png) -->
+    <img class="plane" src="assets/plane.png" alt="">
+    <div class="roles">
+      <a class="role" href="student/login.html">Learner</a>
+      <a class="role" href="tutor/login.html">Tutor</a>
+    </div>
+    <button class="back" id="backBtn" type="button">&larr; Back</button>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutor login · UpToSkill</title>
+<link rel="icon" href="../assets/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../auth/auth.css">
+<style>
+body{--panel:#06212a;--glow:radial-gradient(circle at 15% 10%,rgba(20,200,190,.5),transparent 55%),radial-gradient(circle at 95% 95%,rgba(29,78,216,.45),transparent 50%);--accent:#0FB5A8;--accent-dark:#0A7F76;--accent-soft:#E0F7F5;--on-accent:#032a27;--ring:rgba(15,181,168,.22);--bg:#F2FAFA;}
+</style>
+</head>
+<body data-role="tutor" data-next="app.html" data-other="../student/login.html">
+<aside class="brand">
+  <a class="home" href="../index.html">&larr; Back to home</a>
+  <div>
+    <div class="mark"><img src="../assets/logo-icon.png" alt=""><span>UpTo<b>Skill</b></span></div>
+    <h1>Share what you know. Earn credits.</h1>
+    <p class="lead">Help learners with live sessions and doubts. Set your own availability and watch your earnings and rating grow.</p>
+    <ul class="perks"><li><i>&#10003;</i><span>Accept requests that match your skills</span></li><li><i>&#10003;</i><span>Live room with shared code editor and chat</span></li><li><i>&#10003;</i><span>Earnings graph, reviews and leaderboard</span></li><li><i>&#10003;</i><span>Level up from Newcomer to Expert mentor</span></li></ul>
+  </div>
+  <small>&copy; UpToSkill &middot; Learn together, grow together.</small>
+  <img class="plane" src="../assets/plane.png" alt="">
+</aside>
+
+<main class="formside">
+  <div class="box">
+    <span class="badge">Tutor</span>
+    <h2 id="title" data-login="Welcome back, mentor" data-signup="Become a tutor">Welcome back, mentor</h2>
+    <p class="sub">Log in to manage your sessions and earnings.</p>
+
+    <div class="tabs" role="tablist"><button type="button" class="on" data-mode="login">Log in</button><button type="button" data-mode="signup">Sign up</button></div>
+
+    <form id="f" novalidate>
+      <div class="err" id="err" role="alert" hidden></div>
+      <label data-only="signup" hidden>Full name<input class="in" id="name" autocomplete="name" placeholder="Your name as learners will see it"></label>
+      <label>Email<input class="in" id="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+      <label>Password<span class="pw"><input class="in" id="password" type="password" placeholder="At least 8 characters" required><button type="button" id="toggle">Show</button></span></label>
+      <button class="go" id="go" type="submit">Log in</button>
+    </form>
+
+    <div class="demo"><span>Demo account: <b>tutor@demo.com</b> / <b>demo1234</b></span><button type="button" id="fill" data-email="tutor@demo.com">Fill in</button></div>
+    <p class="switch">Here to learn instead? <a href="../student/login.html">Go to student login</a></p>
+  </div>
+</main>
+<script src="../auth/auth.js"></script>
+<script src="../auth/login.js"></script>
+</body>
+</html>

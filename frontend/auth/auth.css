@@ -1,0 +1,51 @@
+/* Shared styles for the student and tutor login pages. Each page sets its own accent with body.student / body.tutor */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;min-height:100vh;display:grid;grid-template-columns:1.05fr 1fr;color:var(--ink)}
+a{color:inherit}
+:root{--ink:#0F1B3D;--muted:#55627F;--line:#DDE6F7}
+
+/* ---- left: brand panel ---- */
+.brand{position:relative;overflow:hidden;padding:2.2rem 3rem;display:flex;flex-direction:column;justify-content:space-between;color:#fff;background:var(--panel)}
+.brand::before{content:"";position:absolute;inset:0;background:var(--glow);pointer-events:none}
+.brand>*{position:relative}
+.brand .home{display:inline-flex;align-items:center;gap:.5rem;font-size:.85rem;color:rgba(255,255,255,.75);text-decoration:none;width:max-content}
+.brand .home:hover{color:#fff}
+.brand .mark{display:flex;align-items:center;gap:.7rem;font-weight:800;font-size:1.5rem;letter-spacing:-.02em}
+.brand .mark img{height:46px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.35))}
+.brand .mark b{color:var(--mark,var(--accent))}
+.brand h1{font-size:clamp(1.9rem,3.4vw,2.9rem);line-height:1.1;letter-spacing:-.02em;margin:2rem 0 1rem;max-width:20ch}
+.brand p.lead{color:rgba(255,255,255,.78);max-width:42ch;line-height:1.55}
+.perks{list-style:none;margin-top:1.6rem;display:grid;gap:.8rem;max-width:42ch}
+.perks li{display:flex;gap:.7rem;align-items:flex-start;font-size:.95rem;color:rgba(255,255,255,.9)}
+.perks i{flex:none;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.12);display:grid;place-items:center;font-style:normal;color:var(--accent);font-size:.8rem;font-weight:700}
+.brand small{color:rgba(255,255,255,.55)}
+.brand .plane{position:absolute;right:-30px;bottom:-20px;width:230px;opacity:.9;pointer-events:none}
+
+/* ---- right: form ---- */
+.formside{background:var(--bg);display:flex;align-items:center;justify-content:center;padding:2rem 1.5rem}
+.box{width:100%;max-width:420px}
+.box .badge{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-dark);background:var(--accent-soft);padding:.35rem .75rem;border-radius:99px}
+.box h2{font-size:1.9rem;letter-spacing:-.02em;margin:.9rem 0 .3rem}
+.box .sub{color:var(--muted);font-size:.95rem;margin-bottom:1.4rem}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:1.3rem}
+.tabs button{border:0;background:none;padding:.65rem;border-radius:9px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.tabs button.on{background:var(--accent);color:var(--on-accent);box-shadow:0 4px 12px -4px var(--accent)}
+form{display:grid;gap:1rem}
+label{display:grid;gap:.4rem;font-size:.85rem;font-weight:600}
+.in{width:100%;padding:.8rem .9rem;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-weight:400;background:#fff;color:var(--ink)}
+.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.pw{position:relative}.pw .in{padding-right:4.2rem}
+.pw button{position:absolute;right:.5rem;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font:inherit;font-size:.8rem;font-weight:600;cursor:pointer;padding:.3rem .5rem}
+.go{border:0;border-radius:10px;padding:.9rem;font:inherit;font-weight:700;font-size:1rem;background:var(--accent);color:var(--on-accent);cursor:pointer;transition:filter .2s,transform .1s}
+.go:hover{filter:brightness(1.08)}.go:active{transform:translateY(1px)}.go:disabled{opacity:.6;cursor:wait}
+.err{display:none;background:#FEECEC;color:#9B1C1C;border:1px solid #F7C4C4;border-radius:10px;padding:.7rem .9rem;font-size:.88rem}
+.err.on{display:block}.err a{font-weight:700}
+.demo{margin-top:1.2rem;padding:.8rem .9rem;border:1px dashed var(--line);border-radius:10px;background:#fff;font-size:.82rem;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:.8rem}
+.demo b{color:var(--ink)}.demo button{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:.4rem .7rem;font:inherit;font-weight:600;font-size:.8rem;cursor:pointer;color:var(--ink)}
+.switch{margin-top:1.4rem;text-align:center;font-size:.9rem;color:var(--muted)}.switch a{color:var(--accent-dark);font-weight:700}
+[hidden]{display:none!important}
+
+@media(max-width:860px){
+  body{grid-template-columns:1fr}
+  .brand{padding:1.4rem 1.5rem 1.8rem}.brand h1{margin-top:1.2rem}.perks,.brand .plane,.brand small{display:none}
+}

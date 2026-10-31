@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UpToSkill · Student</title>
+<link rel="icon" href="../assets/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app"><nav id="nav"></nav><main id="main"></main></div>
+<div id="modal" class="ov" hidden></div>
+<div id="toast"></div>
+<script src="../auth/auth.js"></script>
+<script>window.UTS = UTSAuth.require("student", "login.html");</script>
+<script src="app.js"></script>
+</body>
+</html>

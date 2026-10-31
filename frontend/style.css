@@ -1,0 +1,162 @@
+:root{
+  --w: clamp(120px, 19vw, 240px);   /* width of each figure */
+  --move: calc(var(--w) * .03);     /* how far each figure slides on click */
+  --speed: .45s;                    /* slide time (under half a second) */
+
+  /* ===== PUT YOUR WINDOW IMAGE HERE =====
+     The picture must sit in the same folder as this file.
+     Change the file name below to swap the picture. */
+  --window-image: url("assets/classroom.jpg");
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#020914;color:#f7ebe8;overflow-x:hidden;min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+.bg{position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse at 50% 60%,#14305e 0%,#071a38 45%,#01050e 100%)}
+.guides{position:fixed;inset:0;z-index:1;pointer-events:none;max-width:80rem;margin:auto;display:none;justify-content:space-between}
+.guides i{width:25%;border:0 solid rgba(255,255,255,.08)}
+.guides i:first-child{border-right-width:1px}.guides i:last-child{border-left-width:1px}
+@media(min-width:1024px){.guides{display:flex}}
+
+.page{position:relative;z-index:2;max-width:80rem;margin:auto;min-height:100vh;padding:0 1.5rem;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:center;padding:1.8rem 0 1rem;border-bottom:1px solid rgba(255,255,255,.05);
+  font-size:.8rem;letter-spacing:.15em;text-transform:uppercase}
+.top nav{display:flex;gap:1.7rem;color:rgba(203,213,225,.8)}
+.top a:hover{color:#fff}
+.register{color:#fff;text-decoration:underline;text-underline-offset:4px}
+
+main{flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:2rem 0 1.5rem}
+
+/* ---------- title as a window ---------- */
+.window-title{
+  text-align:center;font-weight:900;line-height:1;letter-spacing:-.03em;
+  font-size:clamp(3.4rem,13vw,9.5rem);
+  color:transparent;
+  background-color:#9fb4d6;              /* fallback: title stays visible if the picture is missing */
+  background-image:var(--window-image);
+  background-size:cover;background-position:50% 25%;
+  -webkit-background-clip:text;background-clip:text;
+  filter:brightness(1.2) contrast(1.1) drop-shadow(0 0 1px rgba(255,255,255,.9)) drop-shadow(0 0 22px rgba(255,255,255,.25));
+  animation:pan 18s ease-in-out infinite alternate;
+}
+@keyframes pan{from{background-position:50% 15%}to{background-position:50% 75%}}
+
+.pills{display:flex;justify-content:space-between;max-width:56rem;width:100%;margin:2rem auto 0;padding:0 1rem}
+.pill{display:flex;align-items:center;gap:.6rem;font-size:.75rem;letter-spacing:.18em;text-transform:uppercase;padding:.25rem .8rem;border-radius:99px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.pill b{width:8px;height:8px;border-radius:50%}
+.hot{color:#fde68a}.hot b{background:#fcd34d;box-shadow:0 0 12px #fde047}
+.cold{color:#a5f3fc}.cold b{background:#67e8f9;box-shadow:0 0 12px #67e8f9}
+
+.row{display:grid;grid-template-columns:1fr;gap:2rem;align-items:center;margin:1rem 0}
+@media(min-width:1024px){.row{grid-template-columns:1fr 2fr 1fr}}
+
+.card{width:100%;max-width:20rem;margin:auto;padding:1.25rem;border-radius:1rem;
+  background:rgba(20,48,94,.3);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.13);box-shadow:0 20px 45px -10px rgba(0,0,0,.6);transition:border-color .3s}
+.card:hover{border-color:rgba(255,255,255,.3)}
+.card h2{font-size:.75rem;font-weight:300;letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem}
+.card svg{width:100%;height:7rem;overflow:visible}
+.scan{position:relative;aspect-ratio:1;max-height:12rem;border-radius:.75rem;background:rgba(0,0,0,.5);border:1px solid rgba(125,211,252,.3)}
+.scan span{position:absolute;width:14px;height:14px;border:2px solid #bae6fd}
+.scan span:nth-child(1){top:10px;left:10px;border-right:0;border-bottom:0}
+.scan span:nth-child(2){top:10px;right:10px;border-left:0;border-bottom:0}
+.scan span:nth-child(3){bottom:10px;left:10px;border-right:0;border-top:0}
+.scan span:nth-child(4){bottom:10px;right:10px;border-left:0;border-top:0}
+
+/* ---------- neon figures ---------- */
+.center{display:flex;flex-direction:column;align-items:center;gap:1.5rem}
+.figures{display:flex;align-items:flex-end;justify-content:center}
+.fig{width:var(--w);height:auto;overflow:visible;fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px #7dd3fc) drop-shadow(0 0 22px #38bdf8);
+  transition:transform var(--speed) cubic-bezier(.5,0,.2,1),filter var(--speed)}
+.teacher{transform:translateX(0)}
+/* student faces the teacher; hands are 1 finger apart */
+.student{transform:translateX(0) scaleX(-1);margin-left:calc(var(--w) * -.0133);height:auto}
+.figures.touch .teacher{transform:translateX(var(--move))}
+.figures.touch .student{transform:translateX(calc(var(--move) * -1)) scaleX(-1)}
+.figures.touch .fig{filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 16px #fff) drop-shadow(0 0 34px #7dd3fc)}
+
+.start{cursor:pointer;border:1px solid rgba(255,255,255,.8);background:#fff;color:#020617;font-family:inherit;font-weight:600;font-size:.75rem;
+  letter-spacing:.2em;text-transform:uppercase;padding:.9rem 2.3rem;border-radius:99px;
+  box-shadow:0 0 28px rgba(255,255,255,.4);transition:transform .3s,box-shadow .3s}
+.start:hover{transform:translateY(-1px) scale(1.03);box-shadow:0 0 40px rgba(186,230,253,.8)}
+.start:disabled{pointer-events:none}
+
+/* white screen: circle grows from the button to cover everything */
+.flash{position:fixed;inset:0;z-index:100;background:#fff;pointer-events:none;
+  clip-path:circle(0 at var(--x,50%) var(--y,50%));transition:clip-path .5s cubic-bezier(.6,0,.3,1)}
+.flash.go{clip-path:circle(150vmax at var(--x,50%) var(--y,50%));pointer-events:all}
+
+.foot{display:grid;grid-template-columns:1fr;gap:1.5rem;align-items:end;text-align:center;font-size:.75rem;color:#cbd5e1;line-height:1.5;padding-top:1rem}
+.about{font-size:1.4rem;font-weight:300;color:#fff;letter-spacing:.03em}
+.about small{display:block;font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;color:#7dd3fc;margin-bottom:.5rem}
+.about em{color:rgba(125,211,252,.6);font-family:Georgia,serif;font-size:1rem}
+@media(min-width:768px){.foot{grid-template-columns:1fr 1fr 1fr}.foot p:first-child{text-align:left}.foot .right{text-align:right}}
+
+/* ---------- STEP 3: question + plane + Learner / Tutor ---------- */
+.choose{position:fixed;inset:0;z-index:101;display:flex;align-items:center;justify-content:center;
+  visibility:hidden;pointer-events:none;overflow:hidden}
+.choose.show{visibility:visible;pointer-events:all}
+
+.ask{position:absolute;top:14vh;left:0;right:0;padding:0 1rem;text-align:center;font-weight:300;
+  font-size:clamp(1.6rem,4.5vw,3rem);letter-spacing:.02em;color:#a3a8b3;opacity:0;transform:translateY(12px)}
+.ask small{display:block;margin-top:.8rem;font-size:.75rem;letter-spacing:.3em;text-transform:uppercase;color:#c3c7cf}
+.choose.show .ask{animation:rise .8s .1s ease forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* plane: slides diagonally from bottom-left to top-right */
+.plane{position:absolute;left:0;bottom:0;z-index:1;width:clamp(180px,32vw,340px);height:auto;opacity:0}
+.choose.show .plane{animation:fly 2.4s cubic-bezier(.3,.1,.2,1) forwards}
+@keyframes fly{
+  0%{opacity:0;transform:translate(-110%,110%)}
+  12%{opacity:1}
+  100%{opacity:1;transform:translate(calc(100vw - 100% - 6vw),calc(-100vh + 100% + 6vh))}
+}
+
+/* buttons appear while the plane is still flying */
+.roles{position:relative;z-index:2;display:flex;flex-wrap:wrap;justify-content:center;gap:1.2rem;margin-top:6vh}
+.role{background:#102daa;color:#fff;text-decoration:none;font-weight:600;font-size:.85rem;letter-spacing:.2em;text-transform:uppercase;
+  padding:1rem 2.8rem;border-radius:99px;box-shadow:0 10px 26px -8px rgba(15, 247, 255, 0.7);
+  opacity:0;transform:translateY(16px) scale(.96);transition:box-shadow .3s,filter .3s}
+.role:hover{filter:brightness(1.25);box-shadow:0 12px 34px -6px rgba(15, 247, 255, 0.9)}
+.choose.show .role{animation:rise .7s ease forwards}
+.choose.show .role:nth-child(1){animation-delay:.9s}
+.choose.show .role:nth-child(2){animation-delay:1.15s}
+/* ---------- header: logo + log in ---------- */
+.brandlink{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:1.15rem;letter-spacing:-.01em;text-transform:none;color:#fff}
+.brandlink img{height:34px;width:auto}
+.brandlink b{color:#4f8bff}
+.auth{display:flex;align-items:center;gap:1.4rem}
+.login{color:rgba(203,213,225,.85)}
+@media(max-width:700px){.top nav{display:none}.top{font-size:.72rem}.brandlink span{display:none}}
+
+/* back button on the Learner / Tutor choice screen */
+.back{position:absolute;top:1.6rem;left:1.6rem;z-index:3;border:0;background:none;color:#64748b;font:inherit;font-size:.85rem;letter-spacing:.1em;cursor:pointer}
+.back:hover{color:#102daa}
+
+/* ---------- sections below the hero ---------- */
+.more{position:relative;z-index:2;max-width:80rem;margin:0 auto;padding:0 1.5rem}
+.blk{padding:5rem 0 1rem;scroll-margin-top:1rem}
+.blk h2{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;letter-spacing:-.02em;text-align:center}
+.blead{text-align:center;color:rgba(203,213,225,.75);max-width:46ch;margin:.8rem auto 2.4rem;line-height:1.55}
+.grid3,.grid2{display:grid;gap:1.2rem}
+.grid3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.grid2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));max-width:56rem;margin:0 auto}
+.blk article{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:18px;padding:1.6rem;backdrop-filter:blur(6px)}
+.blk article i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#1D4ED8;font-style:normal;font-weight:700;margin-bottom:1rem}
+.blk article h3{font-size:1.15rem;margin-bottom:.5rem}
+.blk article p{color:rgba(203,213,225,.75);line-height:1.5;font-size:.95rem}
+.side-card ul{list-style:none;display:grid;gap:.5rem;margin:.8rem 0 1.4rem;color:rgba(226,232,240,.9);font-size:.95rem}
+.side-card li::before{content:"\2713";color:#4f8bff;margin-right:.6rem;font-weight:700}
+.side-card.tutor li::before{color:#2dd4bf}
+.cta{display:inline-block;background:#1D4ED8;color:#fff;font-weight:600;padding:.75rem 1.6rem;border-radius:99px;font-size:.9rem;transition:filter .2s}
+.side-card.tutor .cta{background:#0FB5A8;color:#032a27}
+.cta:hover{filter:brightness(1.15)}
+.price article{text-align:center}
+.price b{font-size:3rem;font-weight:800}.price span{margin-left:.4rem;color:rgba(203,213,225,.75)}
+.price .pop{border-color:#4f8bff;box-shadow:0 0 40px -10px rgba(79,139,255,.6)}
+.fine{text-align:center;color:rgba(148,163,184,.8);font-size:.85rem;margin-top:1.6rem}
+.ft{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-top:4rem;padding:1.6rem 0 2rem;border-top:1px solid rgba(255,255,255,.07);color:rgba(148,163,184,.8);font-size:.85rem}
+.ft a:hover{color:#fff}
+html{scroll-behavior:smooth}
