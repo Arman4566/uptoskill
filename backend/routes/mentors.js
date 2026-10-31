@@ -23,4 +23,13 @@ router.get('/', ah(async (req, res) => {
   res.json({ prices, mentors: rows });
 }));
 
+// Open times a tutor has added (future, not booked), for the booking form.
+router.get('/:id/slots', ah(async (req, res) => {
+  const { rows } = await query(
+    `SELECT id, starts_at, ends_at FROM availability_slots
+      WHERE user_id = $1 AND is_booked = false AND starts_at > now() ORDER BY starts_at LIMIT 100`,
+    [Number(req.params.id) || 0]);
+  res.json(rows);
+}));
+
 export default router;

@@ -9,9 +9,41 @@
   async function start(user) {
     me = user;
     $("#app").innerHTML = `<div><h1>Lessons</h1><p class="mut">Video lessons with screen sharing. After each lesson the tutor's notes are sent to the student as a PDF they can open any time.</p></div>
+      ${me.level >= 2 ? `<section class="card pad" id="avail"></section>` : ""}
       <section class="card pad" id="book"></section><section class="card pad"><h2>Your lessons</h2><div id="list"></div></section>`;
     try { book = await api("/mentors"); } catch (e) { book = { mentors: [], prices: [] }; }
-    drawBook(); load();
+    drawBook(); load(); if (me.level >= 2) drawAvail();
+  }
+
+  /* Tutor: add the times students can book. Saved on the server, so students see them straight away. */
+  const local = d => { const p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+  async function drawAvail() {
+    let slots = [];
+    try { slots = await api("/slots/mine"); } catch (e) { /* shown empty */ }
+    const t = new Date(Date.now() + 3600e3); t.setMinutes(0, 0, 0);
+    $("#avail").innerHTML = `<h2>Your availability</h2><p class="mut">Add the times you can teach. Students pick one of these when they book you.</p>
+      <form id="af" class="row"><label>From<input type="datetime-local" id="as" required value="${local(t)}"></label>
+      <label>To<input type="datetime-local" id="ae" required value="${local(new Date(t.getTime() + 3600e3))}"></label>
+      <button class="btn">Add time</button></form><p class="err" id="ae2" hidden></p>
+      <div style="margin-top:8px">${slots.length ? slots.map(x => `<div class="item"><div><b>${when(x.starts_at)}</b> <span class="mut">to ${new Date(x.ends_at).toLocaleTimeString([], { timeStyle: "short" })}</span></div><div class="row"><span class="chip ${x.is_booked ? "warn" : "ok"}">${x.is_booked ? "Booked" : "Open"}</span>${x.is_booked ? "" : `<button class="btn ghost" data-del="${x.id}">Remove</button>`}</div></div>`).join("") : `<p class="mut">No upcoming times yet.</p>`}</div>`;
+    $("#af").onsubmit = async ev => {
+      ev.preventDefault();
+      try {
+        await api("/slots", { method: "POST", body: { startsAt: new Date($("#as").value).toISOString(), endsAt: new Date($("#ae").value).toISOString() } });
+        toast("Time added. Students can book it now."); drawAvail();
+      } catch (e) { const el = $("#ae2"); el.hidden = false; el.textContent = e.code === "VALIDATION" ? "Please pick a valid start and end." : e.message; }
+    };
+    document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { try { await api("/slots/" + b.dataset.del, { method: "DELETE" }); drawAvail(); } catch (e) { toast(e.message); } });
+  }
+
+  async function mentorSlots() {
+    const box = $("#bsl"), mid = $("#bm").value;
+    box.innerHTML = `<option value="">Loading times...</option>`;
+    let slots = [];
+    try { slots = await api(`/mentors/${mid}/slots`); } catch (e) { /* none */ }
+    box.innerHTML = slots.length
+      ? slots.map(x => `<option value="${x.id}">${esc(when(x.starts_at))} to ${esc(new Date(x.ends_at).toLocaleTimeString([], { timeStyle: "short" }))}</option>`).join("")
+      : `<option value="">This tutor has not added any times yet</option>`;
   }
 
   function drawBook() {
@@ -19,18 +51,20 @@
     const price = m => { const p = book.prices.find(x => x.minutes === Number(m)); return p ? p.studentCredits : ""; };
     $("#book").innerHTML = `<h2>Book a lesson</h2><form id="bf" style="display:flex;flex-direction:column;gap:12px;max-width:560px">
       <label>Tutor<select id="bm">${book.mentors.map(m => `<option value="${m.id}">${esc(m.name)} · level ${m.level} · ${esc((m.skills || []).join(", "))}</option>`).join("")}</select></label>
+      <label>Time<select id="bsl"></select></label>
       <label>Length<select id="bt">${book.prices.map(p => `<option value="${p.minutes}">${p.minutes} minutes · ${p.studentCredits} credits</option>`).join("")}</select></label>
       <label>What do you need help with?<input id="bh" minlength="3" maxlength="80" required placeholder="e.g. Fix my useEffect loop"></label>
       <label>Describe the problem<textarea id="bp" minlength="10" required></textarea></label>
       <p class="err" id="be" hidden></p><div><button class="btn orange" id="bc">Request lesson (${price(book.prices[0].minutes)} credits)</button></div>
       <p class="mut">Credits are only held once the tutor accepts, and released to the tutor when the lesson ends.</p></form>`;
+    $("#bm").onchange = mentorSlots; mentorSlots();
     $("#bt").onchange = () => { $("#bc").textContent = `Request lesson (${price($("#bt").value)} credits)`; };
     $("#bf").onsubmit = async ev => {
       ev.preventDefault();
       try {
-        await api("/sessions", { method: "POST", body: { mentorId: Number($("#bm").value), minutes: Number($("#bt").value), title: $("#bh").value, problemText: $("#bp").value } });
-        toast("Request sent."); $("#bf").reset(); load();
-      } catch (e) { const el = $("#be"); el.hidden = false; el.textContent = e.code === "VALIDATION" ? "Please fill in every field (problem needs 10+ characters)." : e.message; }
+        await api("/sessions", { method: "POST", body: { mentorId: Number($("#bm").value), ...($("#bsl").value ? { slotId: Number($("#bsl").value) } : {}), minutes: Number($("#bt").value), title: $("#bh").value, problemText: $("#bp").value } });
+        toast("Request sent."); $("#bf").reset(); mentorSlots(); load();
+      } catch (e) { const el = $("#be"); el.hidden = false; el.textContent = e.code === "VALIDATION" ? "Please fill in every field (problem needs 10+ characters)." : e.code === "BAD_SLOT" ? "That time was just taken. Pick another." : e.message; }
     };
   }
 
