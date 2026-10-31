@@ -3,10 +3,34 @@ import { AppError } from '../lib/errors.js';
 import { config } from '../lib/config.js';
 import * as sessions from './sessions.js';
 import * as daily from './daily.js';
+import { hmacHex } from '../lib/crypto.js';
 
 async function loadForParticipant(sessionId, userId) {
   const s = await sessions.getForUser(sessionId, userId); // 404 / 403 for strangers
   return s;
+}
+
+// Jitsi needs no account or key. The room name carries a secret suffix so nobody can guess another lesson's room.
+async function jitsiJoin(s, userId, isTutor) {
+  const roomName = `UpToSkill-${s.id}-${hmacHex(process.env.JWT_SECRET || 'dev', `jitsi:${s.id}`).slice(0, 12)}`;
+  if (s.video_room !== roomName) await query('UPDATE sessions SET video_room = $2 WHERE id = $1', [s.id, roomName]);
+  if (isTutor && s.status === 'accepted') {
+    s = await sessions.start(s.id, userId).catch((err) => {
+      if (err.code === 'INVALID_TRANSITION') return s;
+      throw err;
+    });
+  }
+  const { rows } = await query('SELECT name FROM users WHERE id = $1', [userId]);
+  return {
+    provider: 'jitsi',
+    role: isTutor ? 'tutor' : 'student',
+    domain: config.video.jitsiDomain,
+    roomName,
+    embed: config.video.jitsiEmbed,
+    userName: rows[0].name,
+    recording: false,
+    session: { id: s.id, title: s.title, minutes: s.minutes, status: s.status, problemText: s.problem_text },
+  };
 }
 
 // Gives a participant everything the browser needs to join the lesson.
@@ -17,6 +41,7 @@ export async function joinInfo(sessionId, userId) {
     throw new AppError(409, 'LESSON_NOT_OPEN', `lesson is ${s.status}; it opens once the tutor accepts`);
   }
   const isTutor = userId === s.mentor_id;
+  if (config.video.provider === 'jitsi') return jitsiJoin(s, userId, isTutor);
   const name = `uts-s${s.id}`;
   const room = await daily.ensureRoom({ name, minutes: s.minutes });
   if (s.video_room !== name) await query('UPDATE sessions SET video_room = $2 WHERE id = $1', [s.id, name]);
@@ -33,6 +58,7 @@ export async function joinInfo(sessionId, userId) {
     roomName: name, userId, userName: rows[0].name, isOwner: isTutor, minutes: s.minutes,
   });
   return {
+    provider: 'daily',
     role: isTutor ? 'tutor' : 'student',
     roomUrl: room.url,
     token,

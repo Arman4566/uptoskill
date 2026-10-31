@@ -8,7 +8,7 @@
 
   async function start(user) {
     me = user;
-    $("#app").innerHTML = `<div><h1>Lessons</h1><p class="mut">Video lessons with screen sharing. Every lesson is recorded so the student can watch it again.</p></div>
+    $("#app").innerHTML = `<div><h1>Lessons</h1><p class="mut">Video lessons with screen sharing. After each lesson the tutor's notes are sent to the student as a PDF they can open any time.</p></div>
       <section class="card pad" id="book"></section><section class="card pad"><h2>Your lessons</h2><div id="list"></div></section>`;
     try { book = await api("/mentors"); } catch (e) { book = { mentors: [], prices: [] }; }
     drawBook(); load();
@@ -42,7 +42,10 @@
       if (tutor && s.status === "requested") acts.push(`<button class="btn" data-a="accept" data-id="${s.id}">Accept</button>`, `<button class="btn ghost" data-a="decline" data-id="${s.id}">Decline</button>`);
       if (["accepted", "in_progress"].includes(s.status)) acts.push(`<a class="btn orange" href="lesson.html?session=${s.id}">${tutor ? "Open classroom" : "Join lesson"}</a>`);
       if (["requested", "accepted"].includes(s.status)) acts.push(`<button class="btn ghost" data-a="cancel" data-id="${s.id}">Cancel</button>`);
-      if (s.status === "completed") acts.push(`<button class="btn ghost" data-a="rec" data-id="${s.id}">Recordings</button>`);
+      if (s.status === "completed") {
+        if (s.has_notes) acts.push(`<button class="btn orange" data-a="pdf" data-id="${s.id}">Notes (PDF)</button>`);
+        acts.push(`<button class="btn ghost" data-a="rec" data-id="${s.id}">Recordings</button>`);
+      }
       const money = tutor ? `You earn ${s.tutor_credits ?? s.credits} credits` : `${s.credits} credits`;
       return `<div class="item"><div><b>${esc(s.title)}</b><div class="chips" style="margin-top:6px"><span class="chip">${tutor ? "You teach" : "You learn"}</span><span class="chip">${s.minutes} min</span><span class="chip">${money}</span><span class="chip ${st[1]}">${st[0]}</span></div><small class="mut">${when(s.created_at)}</small></div><div class="row">${acts.join("")}</div></div>`;
     }).join("") : `<p class="mut">No lessons yet.</p>`;
@@ -51,6 +54,7 @@
 
   async function act(a, id) {
     if (a === "rec") return recordings(id);
+    if (a === "pdf") { try { await UTSApi.download(`/sessions/${id}/notes.pdf`, `lesson-${id}-notes.pdf`); } catch (e) { toast(e.message); } return; }
     try { await api(`/sessions/${id}/${a}`, { method: "POST" }); toast({ accept: "Accepted. The student's credits are now held.", decline: "Declined.", cancel: "Cancelled." }[a]); }
     catch (e) { toast(e.code === "INSUFFICIENT_CREDITS" ? "The student does not have enough credits yet." : e.message); }
     load();

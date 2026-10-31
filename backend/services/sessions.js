@@ -3,6 +3,7 @@ import { AppError } from '../lib/errors.js';
 import { bus } from '../lib/events.js';
 import { quoteFor, assertMinutes } from '../lib/price.js';
 import * as ledger from './ledger.js';
+import * as notes from './notes.js';
 
 const REQUEST_TTL_MIN = Number(process.env.REQUEST_TTL_MIN || 30);
 const ACCEPTED_TTL_MIN = Number(process.env.ACCEPTED_TTL_MIN || 60);
@@ -199,7 +200,11 @@ export async function complete(sessionId, mentorId) {
     await c.query(LEVEL_UP_SQL, [s.mentor_id]);
     return { session: rows[0], changed: true };
   });
-  if (changed) publish(session, [session.mentor_id, session.learner_id]);
+  if (changed) {
+    publish(session, [session.mentor_id, session.learner_id]);
+    // The notes PDF is made after the money has moved, so a PDF problem can never hold up the tutor's payout.
+    notes.finalize(session.id).catch((e) => console.error('notes pdf failed', e));
+  }
   return session;
 }
 
@@ -212,7 +217,8 @@ export async function getForUser(sessionId, userId) {
 
 export async function listForUser(userId) {
   const { rows } = await query(
-    'SELECT * FROM sessions WHERE learner_id = $1 OR mentor_id = $1 ORDER BY created_at DESC LIMIT 100',
+    `SELECT s.*, EXISTS (SELECT 1 FROM lesson_notes n WHERE n.session_id = s.id AND n.pdf IS NOT NULL) AS has_notes
+       FROM sessions s WHERE s.learner_id = $1 OR s.mentor_id = $1 ORDER BY s.created_at DESC LIMIT 100`,
     [userId]
   );
   return rows;

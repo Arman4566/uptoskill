@@ -12,6 +12,7 @@ import * as simpay from '../services/simpay.js';
 import * as video from '../services/video.js';
 
 config.simpay.payoutDelayMs = 0;     // the pretend bank settles on the next sweep
+config.video.provider = 'daily';          // this test covers the Daily path
 config.daily.apiKey = 'daily_test';
 config.daily.domain = 'uptoskill';
 

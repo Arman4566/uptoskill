@@ -308,3 +308,14 @@ CREATE TABLE IF NOT EXISTS simpay_bank (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, ref)
 );
+
+-- Tutor's lesson notes (typed text + pasted screenshots). When the lesson ends a PDF is built from them and
+-- stored here, so the student can open it any time. Both people can download it afterwards.
+CREATE TABLE IF NOT EXISTS lesson_notes (
+  session_id INT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  body       TEXT NOT NULL DEFAULT '',
+  images     JSONB NOT NULL DEFAULT '[]',
+  pdf        BYTEA,
+  pdf_at     TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

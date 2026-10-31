@@ -25,6 +25,15 @@ export const config = {
     openingBalancePaise: num(process.env.SIMPAY_OPENING_BALANCE_RUPEES, 10000) * 100,
   },
 
+  // Which video tool runs the lesson: 'jitsi' (free, default) or 'daily' (paid recording, see README).
+  video: {
+    provider: (process.env.VIDEO_PROVIDER || 'jitsi').toLowerCase(),
+    // Jitsi server. meet.jit.si is free but cannot be embedded inside other sites, so the lesson opens in its own tab.
+    // For an embedded call, run your own Jitsi and set JITSI_EMBED=true.
+    jitsiDomain: (process.env.JITSI_DOMAIN || 'meet.jit.si').replace(/^https?:\/\//, '').replace(/\/$/, ''),
+    jitsiEmbed: process.env.JITSI_EMBED === 'true',
+  },
+
   daily: {
     apiKey: process.env.DAILY_API_KEY || '',
     domain: process.env.DAILY_DOMAIN || '', // e.g. "uptoskill" for uptoskill.daily.co

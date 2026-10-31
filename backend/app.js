@@ -18,6 +18,8 @@ export const app = express();
 const origins = (process.env.CLIENT_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: origins.length ? origins : true }));
 // Keep the exact bytes of each request: webhook signatures are computed over them, not over parsed JSON.
+// Lesson notes can carry a few screenshots, so that one route accepts a bigger body (this must come first).
+app.use('/sessions/:id/notes', express.json({ limit: '12mb' }));
 app.use(express.json({ limit: '200kb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));

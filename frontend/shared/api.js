@@ -25,6 +25,18 @@
     return data;
   }
 
+  /* Downloads a file the server protects with the login (such as the lesson notes PDF). */
+  async function download(path, filename) {
+    let res;
+    try { res = await fetch(base() + path, { headers: store.get(TOKEN) ? { Authorization: "Bearer " + store.get(TOKEN) } : {} }); }
+    catch (e) { throw Object.assign(new Error("Cannot reach the server. Is it running?"), { code: "NETWORK" }); }
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw Object.assign(new Error(d.message || d.error || "Download failed"), { code: d.error, status: res.status }); }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await res.blob()); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const inr = paise => "₹" + (paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
   const when = iso => iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
@@ -50,5 +62,5 @@
   }
   const logout = () => { store.del(TOKEN); store.del(ME); location.reload(); };
 
-  window.UTSApi = { api, boot, logout, esc, inr, when, toast };
+  window.UTSApi = { api, download, boot, logout, esc, inr, when, toast };
 })();
