@@ -48,8 +48,10 @@ const SIM_REPLIES = ["Okay, trying that now...", "Oh, that makes sense. Can you 
 const RIVAL_NAMES = ["Vikram Joshi", "Karan Mehta", "Sana Qureshi"];
 
 /* ---------- state ---------- */
+const IS_DEMO = !window.UTS || UTS.email === "tutor@demo.com";   // sample history / learners / bounties only for the demo login
+const OTHERS = [{ name: "Karan Mehta", level: 4, sessions: 27, rating: 4.9 }, { name: "Vikram Joshi", level: 4, sessions: 31, rating: 4.7 }, { name: "Sana Qureshi", level: 3, sessions: 12, rating: 4.5 }, { name: "Ishita Rao", level: 2, sessions: 6, rating: 4.6 }, { name: "Ananya Gupta", level: 2, sessions: 4, rating: 4.4 }, { name: "Dev Malhotra", level: 2, sessions: 3, rating: 4.2 }];
 let S = load();
-function load() { try { const x = JSON.parse(localStorage.getItem(KEY)); if (x && x.v === 2) return x; } catch (e) { } return seed(); }
+function load() { try { const x = JSON.parse(localStorage.getItem(KEY)); if (x && x.v === 2 && (IS_DEMO || x.fresh)) return x; } catch (e) { } return seed(); }   // old copies of the demo data in real accounts are dropped once
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } };
 save();                                                   // persist the seed on first run
 const me = () => S.me;
@@ -76,7 +78,7 @@ function levelFor(sessions, rating) {
   return l;
 }
 function refreshLevel() {
-  const old = S.me.level, l = levelFor(given().length, avgRating()); S.me.level = l; return l > old ? l : 0;
+  const old = S.me.level, l = Math.max(S.me.baseLevel || 1, levelFor(given().length, avgRating())); S.me.level = l; return l > old ? l : 0;
 }
 const levelName = l => LEVELS.find(x => x[0] === l)[1];
 function leaderboard() {
@@ -185,7 +187,18 @@ function roomGet(id) { try { const r = JSON.parse(localStorage.getItem(ROOM(id))
 function roomSet(id, fn) { const r = roomGet(id); fn(r); try { localStorage.setItem(ROOM(id), JSON.stringify(r)); } catch (e) { } return r; }
 
 /* ---------- seed ---------- */
+/* A real (non-demo) tutor starts clean: no fake history, learners, requests or bounties; 10 welcome credits.
+   New tutors start at level 2 (Helper) - the same as the server - so level-1 students are allowed to book them. */
+function freshSeed() {
+  const now = Date.now(), MAX = Number.MAX_SAFE_INTEGER;
+  const T = { v: 2, fresh: true, nid: 1000, ledger: [], sessions: [], bounties: [], instant: [], slots: [], ratings: [], badges: [], notes: {}, spawn: { inst: MAX, req: MAX, nInst: 0, nReq: 0 }, ai: { calls: [] }, settings: { aiOn: true, feePct: 0 }, toasts: [] };
+  T.me = { id: "me", name: window.UTS ? UTS.name : "Tutor", level: 2, baseLevel: 2, bio: "", langs: ["English"], online: true, joined: now, skills: [] };
+  T.users = {}; T.others = OTHERS.slice();
+  T.ledger.push({ id: T.nid++, uid: "me", delta: 10, reason: "starter", refType: null, refId: null, note: "Welcome credits", ts: now });
+  return T;
+}
 function seed() {
+  if (!IS_DEMO) return freshSeed();
   const now = Date.now(), R = rng(11), pick = a => a[Math.floor(R() * a.length)];
   const T = { v: 2, nid: 1000, ledger: [], sessions: [], bounties: [], instant: [], slots: [], ratings: [], badges: [], notes: {}, spawn: { inst: now + 6000, req: now + 30000, nInst: 0, nReq: 0 }, ai: { calls: [] }, settings: { aiOn: true, feePct: 0 }, toasts: [] };
   const joined = now - 16 * 30 * DAY;
@@ -194,7 +207,7 @@ function seed() {
   const L = [["Riya Verma", 1, ["English"]], ["Rohit Das", 1, ["Hindi", "English"]], ["Meera Patel", 1, ["English"]], ["Arjun Thakur", 1, ["Hindi"]], ["Aman Khan", 1, ["English", "Hindi"]], ["Pooja Singh", 2, ["English"]],
     ["Sameer Kulkarni", 1, ["Marathi", "English"]], ["Kavya Nair", 2, ["English"]], ["Dev Malhotra", 2, ["Hindi", "English"]], ["Ananya Gupta", 2, ["English", "Hindi"]], ["Tanvi Shah", 1, ["English"]], ["Imran Sheikh", 1, ["Hindi"]]];
   T.users = {}; L.forEach((l, i) => { T.users["L" + (i + 1)] = { id: "L" + (i + 1), name: l[0], level: l[1], langs: l[2] }; });
-  T.others = [{ name: "Karan Mehta", level: 4, sessions: 27, rating: 4.9 }, { name: "Vikram Joshi", level: 4, sessions: 31, rating: 4.7 }, { name: "Sana Qureshi", level: 3, sessions: 12, rating: 4.5 }, { name: "Ishita Rao", level: 2, sessions: 6, rating: 4.6 }, { name: "Ananya Gupta", level: 2, sessions: 4, rating: 4.4 }, { name: "Dev Malhotra", level: 2, sessions: 3, rating: 4.2 }];
+  T.others = OTHERS.slice();
   const led = (u, d, r, rt, ri, n, ts) => T.ledger.push({ id: T.nid++, uid: u, delta: d, reason: r, refType: rt, refId: ri, note: n, ts });
   led("me", 10, "starter", null, null, "Welcome credits", joined);
   Object.keys(T.users).forEach(k => led(k, 10, "starter", null, null, "Welcome credits", joined));

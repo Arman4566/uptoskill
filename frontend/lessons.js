@@ -69,7 +69,9 @@
   }
 
   async function load() {
-    const list = await api("/sessions");
+    let list;
+    try { list = await api("/sessions"); }
+    catch (e) { $("#list").innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
     $("#list").innerHTML = list.length ? list.map(s => {
       const tutor = s.mentor_id === me.id, st = STATUS[s.status] || [s.status, ""];
       const acts = [];

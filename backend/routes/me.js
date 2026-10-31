@@ -10,7 +10,7 @@ router.use(requireAuth);
 
 router.get('/', ah(async (req, res) => {
   const { rows } = await query(
-    `SELECT id, name, email, level, languages, bio, rating_avg, rating_count, sessions_given, created_at
+    `SELECT id, name, email, role, level, languages, bio, rating_avg, rating_count, sessions_given, created_at
        FROM users WHERE id = $1`, [req.userId]
   );
   if (!rows.length) throw new AppError(404, 'USER_NOT_FOUND');

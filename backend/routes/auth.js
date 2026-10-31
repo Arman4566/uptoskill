@@ -15,7 +15,12 @@ const registerSchema = z.object({
   email: z.string().trim().email().max(200),
   password: z.string().min(8).max(100),
   languages: z.array(z.string().max(30)).max(5).default([]),
+  role: z.enum(['student', 'tutor']).default('student'),
 });
+
+// New tutors start at level 2 (Helper) so level-1 students can actually book them.
+// Students start at level 1 and never get promoted by studying, only by teaching.
+const START_LEVEL = { student: 1, tutor: 2 };
 
 router.post('/register', ah(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -24,9 +29,9 @@ router.post('/register', ah(async (req, res) => {
     // User row and starter-credit ledger row commit together or not at all.
     const user = await withTx(async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO users (name, email, password_hash, languages)
-         VALUES ($1, $2, $3, $4) RETURNING id, name, email, level, languages`,
-        [body.name, body.email.toLowerCase(), hash, body.languages]
+        `INSERT INTO users (name, email, password_hash, languages, role, level)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role, level, languages`,
+        [body.name, body.email.toLowerCase(), hash, body.languages, body.role, START_LEVEL[body.role]]
       );
       await ledger.credit(c, {
         userId: rows[0].id, amount: STARTER_CREDITS, reason: 'starter', refType: 'user', refId: rows[0].id,
@@ -35,7 +40,7 @@ router.post('/register', ah(async (req, res) => {
     });
     res.status(201).json({ user, token: signToken(user) });
   } catch (err) {
-    if (err.code === '23505') throw new AppError(409, 'EMAIL_TAKEN');
+    if (err.code === '23505') throw new AppError(409, 'EMAIL_TAKEN', 'This email is already registered.');
     throw err;
   }
 }));
@@ -45,12 +50,12 @@ const loginSchema = z.object({ email: z.string().email(), password: z.string().m
 router.post('/login', ah(async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
   const { rows } = await query(
-    'SELECT id, name, email, level, languages, password_hash FROM users WHERE email = $1',
+    'SELECT id, name, email, role, level, languages, password_hash FROM users WHERE email = $1',
     [email.toLowerCase()]
   );
   const row = rows[0];
   if (!row || !(await bcrypt.compare(password, row.password_hash))) {
-    throw new AppError(401, 'BAD_CREDENTIALS');
+    throw new AppError(401, 'BAD_CREDENTIALS', 'Wrong email or password.');
   }
   const { password_hash, ...user } = row; // eslint-disable-line no-unused-vars
   res.json({ user, token: signToken(user) });

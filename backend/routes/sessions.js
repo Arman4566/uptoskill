@@ -34,6 +34,13 @@ router.get('/:id', ah(async (req, res) => {
   res.json(await sessions.getForUser(idParam.parse(req.params.id), req.userId));
 }));
 
+// Recordings are not part of this build yet. Answering with an empty list (instead of a 404 page) lets the
+// Lessons page say "no recording" cleanly. Participants only.
+router.get('/:id/recordings', ah(async (req, res) => {
+  await sessions.getForUser(idParam.parse(req.params.id), req.userId);
+  res.json([]);
+}));
+
 for (const action of ['accept', 'decline', 'cancel', 'start', 'complete']) {
   router.post(`/:id/${action}`, ah(async (req, res) => {
     const id = idParam.parse(req.params.id);

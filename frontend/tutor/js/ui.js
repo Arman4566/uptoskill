@@ -105,6 +105,7 @@ function renderNav() {
   syncPublic();
   $("#nav").innerHTML = `<div class="logo"><img class="logo-full" src="../assets/logo.png" alt="UpToSkill"><img class="logo-icon" src="../assets/logo-icon.png" alt="UpToSkill"></div>` +
     menu().map(([id, l, i, n]) => `<button class="nav-item ${id === page || (id === "sessions" && page === "room") ? "on" : ""}" data-act="go" data-id="${id}" ${id === page ? 'aria-current="page"' : ""}>${icon(i)}<span>${l}</span>${n ? `<em class="badge-n">${n}</em>` : ""}</button>`).join("") +
+    `<a class="nav-item" href="../lessons.html" title="Accept real lesson requests and add availability (needs the server)">${icon("video")}<span>Live Lessons</span></a>` +
     `${UTSTheme.control()}<div class="side">${levelCard()}<div class="me"><div class="mehead">${avMe(40)}<div><b>${esc(S.me.name)}</b>Tutor · Level ${S.me.level} ${levelName(S.me.level)}</div></div><span class="mc">${icon("wallet", 14)} ${bal("me")} credits</span></div><button class="btn ghost" data-act="logout">Log out</button></div>`;
 }
 function go(id, a, keep) {
@@ -253,7 +254,7 @@ const PAGES = {
       <div class="room-grid"><div class="card pad"><div class="row"><b>${icon("code", 18)} Shared code editor</b><span class="mut" style="margin-left:auto" id="syncst">Synced</span></div><textarea id="ed" class="code" spellcheck="false" aria-label="Shared code editor"></textarea></div>
       <div class="card pad chat"><b>${icon("help", 18)} Room chat</b><div id="msgs" class="msgs" aria-live="polite"></div><div class="row"><input class="in" id="chat" placeholder="Type a message and press Enter" aria-label="Chat message"><button class="btn" data-act="send" aria-label="Send">${icon("send", 16)}</button></div></div></div>
       <div class="card pad"><label class="f">Private mentor notes (used for the AI summary)<textarea class="in" id="mn" rows="2" placeholder="What did the learner struggle with? What should they practise?">${esc(s.mentorNotes || "")}</textarea></label>
-      <div class="row"><button class="btn orange" data-act="endsession" data-id="${s.id}">End session &amp; confirm completion</button><button class="btn ghost" data-act="learnerwin" data-id="${s.id}">${icon("users", 18)} Open learner window</button><button class="btn ghost" data-act="jitsi" data-id="${s.id}">${icon("ext", 18)} Video call (Jitsi)</button><button class="btn ghost" data-act="go" data-id="sessions">Leave room</button></div></div>`;
+      <div class="row"><button class="btn orange" data-act="endsession" data-id="${s.id}">End session &amp; confirm completion</button><button class="btn ghost" data-act="learnerwin" data-id="${s.id}">${icon("users", 18)} Open learner window</button><button class="btn ghost" data-act="jitsi" data-id="${s.id}">${icon("video", 18)} Open virtual classroom</button><button class="btn ghost" data-act="go" data-id="sessions">Leave room</button></div></div>`;
   }
 };
 function threadCard(c) {
@@ -361,7 +362,19 @@ const ACT = {
   endyes: id => { const s = sess(id), n = $("#mn") ? $("#mn").value : s.mentorNotes; closeModal(); if (ok(Sess.complete(id, n))) { save(); toast(`Session completed. +${s.credits - (S.settings.feePct ? Math.ceil(s.credits * S.settings.feePct / 100) : 0)} credits paid to you`); T.sess = "past"; go("sessions"); } },
   send: () => sendChat(arg, "tutor"),
   learnerwin: id => { const s = sess(id); window.open(location.pathname + `?room=${id}&as=learner&t=${s.token}`, "_blank"); toast("Learner window opened. Type in either window to see live sync."); },
-  jitsi: id => window.open("https://meet.jit.si/UpToSkill-" + sess(id).token, "_blank", "noopener"),
+  jitsi: id => {
+    const s = sess(id); if (!s) return toast("Session not found.");
+    const roomKey = "uptoskill_virtual_room:" + s.token;
+    let room = "";
+    try { room = localStorage.getItem(roomKey) || ""; } catch { }
+    if (!/^uts-[A-Za-z0-9_-]{8,100}$/.test(room)) {
+      room = "uts-" + crypto.randomUUID().replace(/-/g, "");
+      try { localStorage.setItem(roomKey, room); } catch { }
+    }
+    const api = window.UPTOSKILL_API_URL || "";
+    const url = "../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.me.name) + "&role=tutor" + (api ? "&api=" + encodeURIComponent(api) : "");
+    window.open(url, "_blank", "noopener");
+  },
   notes: id => {
     const s = sess(id), n = S.notes[id], rt = S.ratings.find(r => r.sid === id);
     const body = !n || n.status === "pending" ? "<p>Generating notes...</p>" : n.status === "unavailable" ? `<p><b>Summary unavailable.</b> ${esc(n.err || "")}</p><button class="btn" data-act="retrynotes" data-id="${id}">${icon("repeat", 16)} Retry</button>` :

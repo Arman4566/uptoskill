@@ -43,3 +43,31 @@
 - Back button: `shared/back.js`. In the student and tutor apps it steps back through the app pages you visited (hidden on the first page); on the lessons pages it uses browser history. Login pages already had "Back to home".
 - Landing "Choose your path" text is larger with more space around it.
 - Not included (not in the supplied files): payments, payouts, simpay, recordings, webhooks routes; notes PDF; video room. `lessons.js` buttons for those will show an error until the routes exist.
+
+## Round 4 (backend <-> frontend wiring, clean new accounts)
+**Calling the backend now works**
+- `auth/auth.js`: sign up / log in call `POST /auth/register` and `/auth/login`; the token is saved as `uts_api_token`, the same key `api.js` uses, so Live Lessons does not ask for a second login. Server errors (email taken, wrong password, wrong role) show proper messages. If the server is unreachable it falls back to browser-only accounts and shows an "Offline mode" bar.
+- Backend CORS: any `localhost`/`127.0.0.1` port is allowed in development (the README's `python3 -m http.server 8000` was blocked before). Production only allows `CLIENT_ORIGIN`.
+- Seed accounts did not match the website (`student@demo.com` / `tutor@demo.com` did not exist on the server; only `@demo.test` did). They exist now, duplicates removed. Seed is still safe to re-run.
+- New `users.role` column (student / tutor) so the student and tutor logins stay separate on the server. `db:migrate` upgrades an existing database in place. New tutors start at level 2 so students can book them (a level-1 tutor could never be booked).
+- `/health` checks the database; the server refuses to start with a clear message if `DATABASE_URL` / `JWT_SECRET` is missing and reports a DB problem at startup; stub `GET /sessions/:id/recordings` so the Lessons page does not hit a 404 page.
+- "Live Lessons" link in both app sidebars; lessons pages have a "My dashboard" link; an expired token now shows a sign-in form instead of a reload loop.
+
+**New accounts showed the demo account's data - fixed**
+- Student and tutor apps only load the sample sessions, tutors' requests, doubts, history, credits and leaderboard for `student@demo.com` / `tutor@demo.com`. Every other account starts empty with 10 welcome credits. Accounts created with the old version have their copied demo data dropped once on next open.
+- Tutor: levelling can no longer demote a new tutor below the starting level 2.
+
+**Other fixes**
+- Student booking offered "60 min / 6 credits"; the server and tutor app use 45 min / 6 credits. Aligned to 45.
+- `.env.example` contained a real database URL and JWT secret. Replaced with placeholders. **Rotate that Neon password and JWT secret**, since they were in the zip.
+
+## Round 5 (merge of the Virtual Classroom update)
+The update was built on an older snapshot (no mentors/slots routes, no `back.js`, older landing CSS), so it was merged by hand instead of copied over.
+- Added: `backend/routes/virtual-room.js` (LiveKit token), `backend/realtime/collab.js` (Socket.IO editor / whiteboard / chat), `frontend/virtual-room.*`, `VIRTUAL_CLASSROOM_SETUP.md`, new packages in `package.json`, LiveKit variables in `.env.example`.
+- Kept from before (the update would have removed them): `/mentors` and `/slots` routes, `quoteFor()`, `shared/back.js` and the Back button, the landing-page text sizes, the real login, clean new accounts, `/health`.
+- Clash fixes:
+  - `app.js` / `index.js`: both route sets are mounted; Socket.IO is attached to the same server and uses the **same CORS rule** as the REST API (`lib/cors.js`), so a localhost frontend works for both.
+  - One backend address for everything: `virtual-room-config.js` is now loaded by the login pages, apps, Lessons and the classroom. On localhost it defaults to `http://localhost:4000`; before, the classroom would have called the page's own port.
+  - Student "Join room" dialog no longer removed the end-session + rating step (sessions could not be completed); the rating buttons are back under the join field.
+  - Tutor button "Video call (Jitsi)" is now "Open virtual classroom".
+  - The public token endpoint is rate limited (20 per minute per IP); empty collaboration rooms are freed after 10 minutes.

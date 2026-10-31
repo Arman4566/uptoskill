@@ -1,8 +1,8 @@
-# UpToSkill server (Lane A)
+# UpToSkill server
 
 ## Setup
 ```bash
-cd server
+cd backend
 cp .env.example .env          # set DATABASE_URL and JWT_SECRET
 npm install
 npm run db:migrate            # applies db/schema.sql (db:reset drops everything first)
@@ -14,7 +14,9 @@ npm run test:race             # 20-way parallel accept/complete/cancel checks
 ## Contract so far
 | Method | Path | Notes |
 |---|---|---|
-| POST | /auth/register, /auth/login | register writes the 10-credit `starter` ledger row |
+| POST | /auth/register, /auth/login | register takes `role` (`student` or `tutor`, default student); tutors start at level 2, students at level 1; writes the 10-credit `starter` ledger row. Responses include `role`. |
+| GET | /health | `{ok, db}`; 503 when the database is unreachable |
+| GET | /sessions/:id/recordings | empty list for now (recordings are not built yet) |
 | GET | /me, /me/ledger | balance = SUM(delta); `creditsInEscrow` shown separately |
 | POST | /sessions | body: mentorId, minutes (15/30/45), title, problemText, tags[], difficulty?, slotId? |
 | GET | /sessions, /sessions/:id | participants only |
@@ -28,8 +30,8 @@ level 2 at 3 sessions given, level 3 at 10 sessions and rating 4.0+, level 4 at 
 Mentors with no ratings yet are not held back by the rating rule. A learner can only book a mentor of a higher level.
 
 ## CORS
-`CLIENT_ORIGIN` is a comma-separated list. The example allows Vite (5173), VS Code Live Server (5500/5501) and
-`null` (index.html opened by double-click). Leave it empty to allow any origin (development only).
+In development every `localhost` / `127.0.0.1` port and `null` (double-clicked `index.html`) is allowed automatically.
+`CLIENT_ORIGIN` (comma-separated) adds more origins. With `NODE_ENV=production` only the listed origins are allowed.
 
 ## For Lane C (realtime)
 Services emit on `lib/events.js` after commit: `session:status` `{sessionId,status,session}` and `credits:updated` `{userId}`.

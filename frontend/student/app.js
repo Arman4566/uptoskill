@@ -20,7 +20,7 @@ const TUTORS = [
   { ini: "SQ", name: "Sana Qureshi", level: 3, levelName: "Mentor", rating: 4.5, reviews: 11, sessions: 12, yrs: 3, skills: ["Python", "DSA"],               langs: ["English", "Hindi"], slots: ["today"],             color: "#0B2A6F",
     bio: "Python and DSA mentor. Patient with beginners and strong on interview problems.", quals: [{ deg: "MCA", inst: "Jamia Millia Islamia", year: 2023 }] }
 ];
-const COST = { 15: 2, 30: 4, 60: 6 };
+const COST = { 15: 2, 30: 4, 45: 6 };                       // same lengths and prices as the server (backend/lib/price.js)
 const SLOT = { today: ["Today", "6:00 PM"], tomorrow: ["Tomorrow", "11:00 AM"] };
 
 /* ---------- small helpers ---------- */
@@ -63,7 +63,23 @@ const tAv = (t, s = 48) => t.photo ? `<img class="av ph" src="${t.photo}" alt="$
   `<span class="av" style="background:${t.color};width:${s}px;height:${s}px;font-size:${Math.round(s * .34)}px">${t.ini}</span>`;
 const qualYear = x => x.year > new Date().getFullYear() ? "Pursuing, " + x.year : x.year;
 
+/* Sample data is only for the demo login (student@demo.com). Every other account starts empty with the 10 welcome credits
+   (the same starter amount the server gives on sign-up). */
+const IS_DEMO = !window.UTS || UTS.email === "student@demo.com";
+function freshSeed() {
+  return {
+    user: { name: window.UTS ? UTS.name : "Student", level: 1, levelName: "Newcomer", skills: [], mentor: false },
+    credits: 10, done: 0, mins: 0, nid: 10,
+    streak: { days: 0, goal: 50, last: null },
+    sessions: [],
+    ledger: [{ d: "Today", t: "Welcome credits", a: 10 }],
+    doubts: [],
+    incoming: [],
+    fresh: true                                            // marks "created clean" so old demo copies saved by earlier versions are dropped
+  };
+}
 function seed() {
+  if (!IS_DEMO) return freshSeed();
   return {
     user: { name: window.UTS ? UTS.name : "Riya Verma", level: 1, levelName: "Newcomer", skills: ["React", "SQL"], mentor: false },
     credits: 8, done: 4, mins: 120, nid: 10,
@@ -86,11 +102,15 @@ function seed() {
     incoming: [
       { id: 1, student: "Rohit D.", topic: "Node.js express routing", min: 30, credits: 4 },
       { id: 2, student: "Meera P.", topic: "React props vs state", min: 15, credits: 2 },
-      { id: 3, student: "Arjun T.", topic: "SQL group by", min: 60, credits: 6 }
+      { id: 3, student: "Arjun T.", topic: "SQL group by", min: 45, credits: 6 }
     ]
   };
 }
-let S = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
+let S = (() => {
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { }
+  if (saved && !IS_DEMO && !saved.fresh) saved = null;      // an earlier version copied the demo data into new accounts: start clean once
+  return saved || seed();
+})();
 S.sessions.forEach(s => { if (!s.ts) s.ts = parseWhen(s.day, s.time); });      // older saved data
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const log = (t, a) => S.ledger.unshift({ d: "Today", t, a });
@@ -158,6 +178,7 @@ function menu() {
 function renderNav() {
   $("#nav").innerHTML = `<div class="logo"><img class="logo-full" src="../assets/logo.png" alt="UpToSkill"><img class="logo-icon" src="../assets/logo-icon.png" alt="UpToSkill"></div>` +
     menu().map(([id, l, i]) => `<button class="nav-item ${id === page ? "on" : ""}" data-act="go" data-id="${id}">${icon(i)}<span>${l}</span></button>`).join("") +
+    `<a class="nav-item" href="../lessons.html" title="Book real lessons with tutors (needs the server)">${icon("video")}<span>Live Lessons</span></a>` +
     `${UTSTheme.control()}<div class="side">${streakHTML()}<div class="me"><b>${esc(S.user.name)}</b>${S.user.mentor ? "Mentor mode" : "Student"} · Level ${S.user.level} ${S.user.levelName}</div><button class="btn ghost" data-act="logout">Log out</button></div>`;
 }
 function go(id) {
@@ -210,7 +231,7 @@ const PAGES = {
       ["wallet", "Available credits", fmt(S.credits), `${escrow()} held in escrow`, 1], ["book", "Sessions taken", S.done, "Total", 0],
       ["clock", "Learning time", +(S.mins / 60).toFixed(1) + "h", "Total", 0], ["star", "Badges", got.length, got.length ? got[got.length - 1].name : "None yet", 1]];
     return `${searchHTML()}
-    <section class="hero"><div><h1>Welcome back, ${esc(S.user.name.split(" ")[0])}</h1><p>Stuck on something? Find a peer mentor in seconds.</p></div>
+    <section class="hero"><div><h1>${S.sessions.length || S.done ? "Welcome back" : "Welcome"}, ${esc(S.user.name.split(" ")[0])}</h1><p>Stuck on something? Find a peer mentor in seconds.</p></div>
       <div class="right"><span class="credits">${icon("wallet", 18)} ${fmt(S.credits)} credits</span><button class="btn orange" data-act="go" data-id="instant">${icon("bolt", 18)} Instant Help</button></div></section>
     <div class="stats">${stats.map(s => `<div class="card stat"><span class="ic ${s[4] ? "o" : ""}">${icon(s[0], 22)}</span><div><small>${s[1]}</small><b>${s[2]}</b><em>${s[3]}</em></div></div>`).join("")}</div>
     <section class="sec"><div class="sec-head"><h2>${icon("cal")} Upcoming lectures</h2><a data-act="go" data-id="sessions">View all</a></div>
@@ -233,6 +254,7 @@ const PAGES = {
     return head("Doubt Board", "Post a doubt and let mentors and peers answer.") +
       `<div class="card pad"><div class="row"><input class="in" id="dt" placeholder="Describe your doubt"><select class="in" id="dg" style="flex:none">${["React", "JavaScript", "SQL", "Python", "Node", "DSA"].map(s => `<option>${s}</option>`).join("")}</select>
       <button class="btn" data-act="post">Post doubt</button></div></div>` +
+      (S.doubts.length ? "" : `<div class="empty"><b>No doubts yet</b>Post the first one above.</div>`) +
       S.doubts.map(d => `<div class="card pad"><div class="row"><b style="flex:1">${esc(d.title)}</b><span class="chip">${d.tag}</span><span class="chip ${d.solved ? "g" : "o"}">${d.solved ? "Solved" : "Open"}</span></div>
         <p class="mut">Asked by ${esc(d.by)}</p>${d.replies.map(r => `<div class="rep"><b>${esc(r.by)}:</b> ${esc(r.text)}</div>`).join("")}
         <div class="row"><input class="in" id="r${d.id}" placeholder="Write a reply"><button class="btn ghost" data-act="reply" data-id="${d.id}">Reply</button>
@@ -242,13 +264,13 @@ const PAGES = {
     const tot = S.ledger.filter(l => l.a > 0 && /Earned/.test(l.t)).reduce((n, l) => n + l.a, 0);
     return head("Credits & Ledger", "Every credit movement, in one place.") +
       `<div class="stats">${[["Available", fmt(S.credits)], ["In escrow", escrow()], ["Earned as mentor", tot]].map(s => `<div class="card stat"><div><small>${s[0]}</small><b>${s[1]}</b></div></div>`).join("")}</div>
-      <div><button class="btn orange" data-act="buy">${icon("wallet", 18)} Add 5 demo credits</button></div>
+      ${IS_DEMO ? `<div><button class="btn orange" data-act="buy">${icon("wallet", 18)} Add 5 demo credits</button></div>` : ""}
       <div class="card" style="overflow-x:auto"><table><tr><th>When</th><th>Details</th><th>Credits</th></tr>${S.ledger.map(l => `<tr><td>${l.d}</td><td>${esc(l.t)}</td><td class="${l.a > 0 ? "pos" : l.a < 0 ? "neg" : ""}">${l.a > 0 ? "+" : ""}${l.a || "released"}</td></tr>`).join("")}</table></div>`;
   },
   leaderboard() {
     const pts = S.done * 10 + S.streak.days * 5;
-    const rows = [["Ananya Gupta", 420], ["Dev Malhotra", 365], ["Kavya Nair", 310], ["Aman Khan", 205], [S.user.name + " (You)", pts, 1], ["Pooja Singh", 40]].sort((a, b) => b[1] - a[1]);
-    return head("Leaderboard", "Points: 10 per session + 5 per streak day.") +
+    const rows = (IS_DEMO ? [["Ananya Gupta", 420], ["Dev Malhotra", 365], ["Kavya Nair", 310], ["Aman Khan", 205], ["Pooja Singh", 40]] : []).concat([[S.user.name + " (You)", pts, 1]]).sort((a, b) => b[1] - a[1]);
+    return head("Leaderboard", "Points: 10 per session + 5 per streak day.") + (IS_DEMO ? "" : `<div class="empty"><b>Just you for now</b>Other learners show up here as they join and finish sessions.</div>`) +
       rows.map((r, i) => `<div class="card lb ${r[2] ? "you" : ""}"><span class="n">#${i + 1}</span><span class="nm">${esc(r[0])}</span><span class="chip ${r[2] ? "o" : ""}">${r[1]} pts</span></div>`).join("");
   },
   profile() {
@@ -258,7 +280,7 @@ const PAGES = {
       <div class="row"><input class="in" id="ps" placeholder="Add a skill"><button class="btn ghost" data-act="addskill">Add skill</button></div></div>
       <div class="card pad"><b>Mentor mode</b><p class="mut">Switch on to see incoming session requests and earn credits.</p>
       <div><button class="btn ${S.user.mentor ? "orange" : ""}" data-act="mentor">${S.user.mentor ? "Mentor mode is ON - turn off" : "Turn on mentor mode"}</button></div></div>
-      <div><button class="btn ghost" data-act="reset">Reset demo data</button></div>`;
+      <div><button class="btn ghost" data-act="reset">${IS_DEMO ? "Reset demo data" : "Reset my data"}</button></div>`;
   },
   requests() {
     return head("Session Requests", "Accept a request to earn its credits.") +
@@ -407,10 +429,24 @@ const ACT = {
     save(); toast("Cancelled. Credits refunded."); go(page);
   },
   join: id => {
-    const s = S.sessions.find(x => x.id == id);
-    modal(`<h3>${esc(s.title)}</h3><div class="room">${icon("video", 40)}<p>Live room with ${s.mentor} (demo)</p></div>
-      <p class="mut">End the session and rate your mentor:</p>
+    const s = S.sessions.find(x => x.id == id); if (!s) return toast("Session not found.");
+    modal(`<h3>Join virtual classroom</h3><p class="mut">${esc(s.title)} · with ${esc(s.mentor)}</p>
+      <label class="f">Room code or invite link<input class="in" id="roomInviteInput" maxlength="500" value="" placeholder="Paste the tutor's invite link or room code"></label>
+      <p class="mut">Paste the invite link or room code shared by your tutor to join the same room.</p>
+      <div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="openroom" data-id="${id}">${icon("video", 18)} Join room</button></div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0"><p class="mut">Lesson finished? End the session and rate your mentor:</p>
       <div class="row">${[1, 2, 3, 4, 5].map(n => `<button class="btn ghost" data-act="finish" data-id="${id}" data-r="${n}">${n}★</button>`).join("")}</div>`);
+  },
+  openroom: id => {
+    const s = S.sessions.find(x => x.id == id); if (!s) return toast("Session not found.");
+    const raw = ((document.querySelector("#roomInviteInput") || {}).value || "").trim();
+    if (!raw) return toast("Paste the invite link or room code shared by your tutor.");
+    let room = raw;
+    try { if (/^https?:\/\//i.test(room)) room = new URL(room).searchParams.get("room") || ""; } catch { room = ""; }
+    if (!/^uts-[A-Za-z0-9_-]{8,100}$/.test(room)) return toast("Enter a valid room code or invite link.");
+    const api = window.UPTOSKILL_API_URL || "";
+    window.open("../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.user.name) + "&role=student" + (api ? "&api=" + encodeURIComponent(api) : ""), "_blank", "noopener");
+    closeModal();
   },
   finish: (id, b) => {
     const s = S.sessions.find(x => x.id == id); s.status = "completed"; s.rating = +b.dataset.r;
@@ -444,7 +480,7 @@ const ACT = {
   },
   decline: id => { S.incoming = S.incoming.filter(x => x.id != id); save(); go("requests"); },
   logout: () => UTSAuth.logout("login.html"),
-  reset: () => { if (confirm("Reset all demo data?")) { S = seed(); save(); toast("Demo data reset"); go("dashboard"); } }
+  reset: () => { if (confirm(IS_DEMO ? "Reset all demo data?" : "Reset this account's data in this browser?")) { S = seed(); save(); toast(IS_DEMO ? "Demo data reset" : "Data reset"); go("dashboard"); } }
 };
 
 document.addEventListener("click", e => {

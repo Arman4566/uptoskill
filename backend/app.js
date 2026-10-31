@@ -6,20 +6,24 @@ import meRoutes from './routes/me.js';
 import sessionRoutes from './routes/sessions.js';
 import mentorRoutes from './routes/mentors.js';
 import slotRoutes from './routes/slots.js';
+import { query } from './db/pool.js';
+import { corsOrigin } from './lib/cors.js';
+import virtualRoomRoutes from './routes/virtual-room.js';
 import { errorHandler } from './middleware/error.js';
 
 export const app = express();
-// CLIENT_ORIGIN may be a comma-separated list (Vite 5173, VS Code Live Server 5500/5501, file:// = "null").
-// Empty means "allow any origin", which is fine for local development only.
-const origins = (process.env.CLIENT_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
-app.use(cors({ origin: origins.length ? origins : true }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: '200kb' }));
 
-app.get('/health', (req, res) => res.json({ ok: true }));
+app.get('/health', async (req, res) => {
+  try { await query('SELECT 1'); res.json({ ok: true, db: true }); }
+  catch { res.status(503).json({ ok: false, db: false }); }
+});
 app.use('/auth', authRoutes);
 app.use('/me', meRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/mentors', mentorRoutes);
 app.use('/slots', slotRoutes);
+app.use('/virtual-room', virtualRoomRoutes);
 
 app.use(errorHandler);

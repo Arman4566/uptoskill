@@ -15,4 +15,5 @@ Flow: `index.html` (landing) -> Learner / Tutor -> `student/login.html` or `tuto
 
 Demo accounts (password `demo1234`): `student@demo.com`, `tutor@demo.com`.
 
-Right now accounts and app data are saved in the browser (localStorage). To use the backend, change `register()` and `login()` in `auth/auth.js` to call `POST /auth/register` and `POST /auth/login` on the backend (default http://localhost:4000).
+Sign-in and sign-up call the backend (default `http://localhost:4000`, change with `localStorage.setItem("uts_api", "https://your-server")`). If it is unreachable the pages fall back to browser-only accounts (localStorage) and show an "Offline mode" bar.
+Only the two demo logins start with sample data; every new account starts empty with 10 credits. App data (sessions, doubts, chat) is still stored in the browser; real bookings are in **Live Lessons** (`lessons.html`), which uses the server.

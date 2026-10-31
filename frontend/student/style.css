@@ -141,3 +141,5 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .fly.refade>*{animation:facein .24s ease both}
 @keyframes facein{from{opacity:0}}
 .card.fly:focus{outline:none}
+
+a.nav-item{text-decoration:none;width:100%;box-sizing:border-box}
