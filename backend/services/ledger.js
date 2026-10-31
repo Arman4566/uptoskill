@@ -66,3 +66,32 @@ export async function grantBonus(client, { mentorId, sessionId }) {
   if (rows[0].n >= BONUS_DAILY_CAP) return false;
   return credit(client, { userId: mentorId, amount: 1, reason: 'bonus', refType: 'session', refId: sessionId });
 }
+
+// ---- Real-money helpers ----------------------------------------------------------------------------
+
+export async function getPlatformUserId(client) {
+  const { rows } = await client.query('SELECT id FROM users WHERE is_platform = true LIMIT 1');
+  if (!rows.length) throw new AppError(500, 'NO_PLATFORM_USER', 'run npm run db:migrate');
+  return rows[0].id;
+}
+
+/*
+  How many credits a user may withdraw as real money.
+  Only credits EARNED by teaching (session payouts, bounty payouts) can be cashed out. Credits that were
+  bought, given as starter credit or given as a bonus can be spent on lessons but never withdrawn, so the
+  website cannot be used to turn free credits (or a refund-free purchase) into cash.
+    withdrawable = min(balance, earned_by_teaching - already_withdrawn)
+  Call it inside a transaction after lockUser() when you are about to act on the number.
+*/
+export async function getWithdrawable(client, userId) {
+  const { rows } = await client.query(
+    `SELECT
+       COALESCE(SUM(delta), 0)::int AS balance,
+       COALESCE(SUM(delta) FILTER (WHERE reason IN ('payout','bounty_payout')), 0)::int AS earned,
+       COALESCE(-SUM(delta) FILTER (WHERE reason IN ('withdraw_hold','withdraw_refund')), 0)::int AS withdrawn
+     FROM credit_ledger WHERE user_id = $1`,
+    [userId]
+  );
+  const { balance, earned, withdrawn } = rows[0];
+  return { balance, earned, withdrawn, withdrawable: Math.max(0, Math.min(balance, earned - withdrawn)) };
+}

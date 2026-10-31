@@ -41,6 +41,11 @@ INSERT INTO credit_ledger (user_id, delta, reason, ref_type, ref_id)
 SELECT id, 10, 'starter', 'user', id FROM users WHERE email LIKE '%@demo.test'
 ON CONFLICT (ref_type, ref_id, reason, user_id) DO NOTHING;
 
+-- Demo only: give the level-3 mentor 500 credits of teaching earnings so "withdraw" can be tried straight away.
+INSERT INTO credit_ledger (user_id, delta, reason, ref_type, ref_id)
+SELECT id, 500, 'payout', 'seed', id FROM users WHERE email = 'neha@demo.test'
+ON CONFLICT (ref_type, ref_id, reason, user_id) DO NOTHING;
+
 -- Fresh free slots for the mentors: today, tomorrow and the day after (all in the future).
 DELETE FROM availability_slots
  WHERE is_booked = false AND user_id IN (SELECT id FROM users WHERE email LIKE '%@demo.test');

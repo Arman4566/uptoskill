@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ah } from '../lib/async.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as sessions from '../services/sessions.js';
+import * as video from '../services/video.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -32,6 +33,14 @@ router.get('/', ah(async (req, res) => {
 
 router.get('/:id', ah(async (req, res) => {
   res.json(await sessions.getForUser(idParam.parse(req.params.id), req.userId));
+}));
+
+// Join the video lesson (creates the private room on first use) and list its recordings.
+router.post('/:id/video-token', ah(async (req, res) => {
+  res.json(await video.joinInfo(idParam.parse(req.params.id), req.userId));
+}));
+router.get('/:id/recordings', ah(async (req, res) => {
+  res.json(await video.listRecordings(idParam.parse(req.params.id), req.userId));
 }));
 
 for (const action of ['accept', 'decline', 'cancel', 'start', 'complete']) {

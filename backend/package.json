@@ -9,7 +9,10 @@
     "db:migrate": "node db/migrate.js",
     "db:reset": "node db/migrate.js --reset",
     "db:seed": "node db/seed.js",
-    "test:race": "node scripts/race-test.js"
+    "test:race": "node scripts/race-test.js",
+    "test:unit": "node --test tests/*.test.js",
+    "test:money": "node scripts/money-test.js",
+    "daily:webhook": "node scripts/register-daily-webhook.js"
   },
   "engines": {
     "node": ">=18.11"

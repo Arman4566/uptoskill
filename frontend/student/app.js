@@ -107,6 +107,7 @@ function menu() {
 function renderNav() {
   $("#nav").innerHTML = `<div class="logo"><img class="logo-full" src="../assets/logo.png" alt="UpToSkill"><img class="logo-icon" src="../assets/logo-icon.png" alt="UpToSkill"></div>` +
     menu().map(([id, l, i]) => `<button class="nav-item ${id === page ? "on" : ""}" data-act="go" data-id="${id}">${icon(i)}<span>${l}</span></button>`).join("") +
+    `<a class="nav-item" href="../lessons.html">${icon("video")}<span>Video Lessons</span></a><a class="nav-item" href="../wallet.html">${icon("wallet")}<span>Buy Credits (real money)</span></a>` +
     `<div class="side">${streakHTML()}<div class="me"><b>${esc(S.user.name)}</b>${S.user.mentor ? "Mentor mode" : "Student"} · Level ${S.user.level} ${S.user.levelName}</div><button class="btn ghost" data-act="logout">Log out</button></div>`;
 }
 function go(id) {

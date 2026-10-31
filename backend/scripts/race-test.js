@@ -27,22 +27,23 @@ const mk = (learnerId, mentorId, minutes = 45) => sessions.createRequest({
 });
 
 await pool.query("DELETE FROM users WHERE email LIKE 'race\\_%@test.local'");
-const learner = await makeUser('learner', 1, 10);
+// Prices include the 5% fee: a 45 min lesson costs the student 300 (tutor 285 + site 15), 15 min costs 100.
+const learner = await makeUser('learner', 1, 400);
 const mentor = await makeUser('mentor', 2, 0);
 
-// Test A: 3 requests of 6 credits, learner has 10. Accept all at once -> exactly one may win.
+// Test A: 3 requests of 300 credits, learner has 400. Accept all at once -> exactly one may win.
 const [s1, s2, s3] = await Promise.all([mk(learner, mentor), mk(learner, mentor), mk(learner, mentor)]);
 const a = await Promise.allSettled([s1, s2, s3].map((s) => sessions.accept(s.id, mentor)));
 const won = a.filter((r) => r.status === 'fulfilled');
 assert.equal(won.length, 1, 'exactly one accept should succeed');
-assert.equal(await balance(learner), 4, 'learner should have 10 - 6 = 4');
-console.log('A ok: overspend blocked, learner balance 4');
+assert.equal(await balance(learner), 100, 'learner should have 400 - 300 = 100');
+console.log('A ok: overspend blocked, learner balance 100');
 
 // Test B: accept the SAME session 20x in parallel -> still one hold.
 const acceptedId = won[0].value.id;
 await Promise.allSettled(Array.from({ length: PARALLEL }, () => sessions.accept(acceptedId, mentor)));
 assert.equal(await count("SELECT COUNT(*)::int n FROM credit_ledger WHERE reason='hold' AND ref_id=$1", [acceptedId]), 1);
-assert.equal(await balance(learner), 4);
+assert.equal(await balance(learner), 100);
 console.log('B ok: one hold row after 20 parallel accepts');
 
 // Test C: complete the SAME session 20x in parallel -> one payout, mentor gets exactly 6.
@@ -50,18 +51,22 @@ await sessions.start(acceptedId, learner);
 const c = await Promise.allSettled(Array.from({ length: PARALLEL }, () => sessions.complete(acceptedId, mentor)));
 assert.ok(c.every((r) => r.status === 'fulfilled'), 'repeat completes are idempotent, not errors');
 assert.equal(await count("SELECT COUNT(*)::int n FROM credit_ledger WHERE reason='payout' AND ref_id=$1", [acceptedId]), 1);
-assert.equal(await balance(mentor), 6);
-assert.equal(await balance(learner), 4);
-console.log('C ok: one payout row after 20 parallel completes, mentor balance 6');
+assert.equal(await count("SELECT COUNT(*)::int n FROM credit_ledger WHERE reason='fee' AND ref_id=$1", [acceptedId]), 1);
+assert.equal(await balance(mentor), 285, 'tutor gets exactly the price they set');
+assert.equal(await balance(learner), 100);
+const platformId = (await pool.query('SELECT id FROM users WHERE is_platform')).rows[0].id;
+const fee = (await pool.query("SELECT COALESCE(SUM(delta),0)::int n FROM credit_ledger WHERE reason='fee' AND ref_id=$1 AND user_id=$2", [acceptedId, platformId])).rows[0].n;
+assert.equal(fee, 15, 'website keeps 15');
+console.log('C ok: one payout + one fee row after 20 parallel completes, tutor 285, website 15');
 
-// Test D: cancel an accepted 2-credit session 20x in parallel -> hold released exactly once.
+// Test D: cancel an accepted 100-credit session 20x in parallel -> hold released exactly once.
 const s4 = await mk(learner, mentor, 15);
 await sessions.accept(s4.id, mentor);
-assert.equal(await balance(learner), 2);
+assert.equal(await balance(learner), 0);
 await Promise.allSettled(Array.from({ length: PARALLEL }, () => sessions.cancel(s4.id, learner)));
 assert.equal(await count("SELECT COUNT(*)::int n FROM credit_ledger WHERE reason='release' AND ref_id=$1", [s4.id]), 1);
-assert.equal(await balance(learner), 4);
-console.log('D ok: one release row after 20 parallel cancels, learner back to 4');
+assert.equal(await balance(learner), 100);
+console.log('D ok: one release row after 20 parallel cancels, learner back to 100');
 
 console.log('\nAll ledger race tests passed');
 await pool.end();

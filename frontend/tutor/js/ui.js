@@ -58,6 +58,7 @@ function levelCard() {
 function renderNav() {
   $("#nav").innerHTML = `<div class="logo"><img class="logo-full" src="../assets/logo.png" alt="UpToSkill"><img class="logo-icon" src="../assets/logo-icon.png" alt="UpToSkill"></div>` +
     menu().map(([id, l, i, n]) => `<button class="nav-item ${id === page || (id === "sessions" && page === "room") ? "on" : ""}" data-act="go" data-id="${id}" ${id === page ? 'aria-current="page"' : ""}>${icon(i)}<span>${l}</span>${n ? `<em class="badge-n">${n}</em>` : ""}</button>`).join("") +
+    `<a class="nav-item" href="../lessons.html">${icon("video")}<span>Video Lessons</span></a><a class="nav-item" href="../wallet.html">${icon("wallet")}<span>Withdraw Money</span></a>` +
     `<div class="side">${levelCard()}<div class="me"><b>${esc(S.me.name)}</b>Tutor · Level ${S.me.level} ${levelName(S.me.level)}<span class="mc">${icon("wallet", 14)} ${bal("me")} credits</span></div><button class="btn ghost" data-act="logout">Log out</button></div>`;
 }
 function go(id, a, keep) {
