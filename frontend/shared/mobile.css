@@ -1,0 +1,34 @@
+/* Phones: student and tutor apps. The sidebar becomes a bottom bar you can swipe, content uses the full width,
+   dialogs fit the screen, inputs are 16px (no iOS zoom) and buttons are easy to tap. Loaded after style.css. */
+html{-webkit-text-size-adjust:100%}
+@media(max-width:700px){
+  body{overflow-x:hidden}
+  .app{flex-direction:column;min-height:100dvh}
+  nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%!important;height:auto;z-index:40;flex-direction:row;align-items:stretch;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))!important;
+    overflow-x:auto;overflow-y:hidden;border-right:0;border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.12);scrollbar-width:none;position:fixed!important}
+  nav::-webkit-scrollbar{display:none}
+  nav .logo{display:none}
+  nav .nav-item{flex:0 0 auto;flex-direction:column;justify-content:center;gap:2px;min-width:64px;min-height:52px;padding:6px 8px;font-size:10px;line-height:1.15;text-align:center;border-radius:12px}
+  nav .nav-item span{display:block!important;max-width:74px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  nav .nav-item svg{width:22px;height:22px}
+  nav .side{display:contents!important}
+  nav .side>*:not(.btn){display:none!important}
+  nav .side .btn{flex:0 0 auto;align-self:center;min-height:44px;margin-left:4px;white-space:nowrap}
+  main{padding:16px 12px calc(92px + env(safe-area-inset-bottom))!important;gap:16px;width:100%}
+  h1.pt,.pt{font-size:22px}
+  .hero{flex-direction:column;align-items:flex-start;gap:12px}
+  .grid,.stats,.cards{grid-template-columns:1fr!important}
+  .card.lec,.thread,.card.search{flex-direction:column;align-items:stretch;gap:10px}
+  .card.search select,.card.search label{width:100%}
+  .row{flex-wrap:wrap}
+  .row>.btn,.lf-act .btn,.foot .btn{flex:1 1 140px}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.tabs .btn{flex:0 0 auto}
+  .btn{min-height:44px}
+  input,select,textarea,.in{font-size:16px!important;max-width:100%}
+  .ov{padding:0;align-items:flex-end}
+  .ov .mod{width:100%!important;max-width:100%!important;max-height:92dvh;overflow:auto;border-radius:18px 18px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+  .msgs{max-height:42dvh}
+  img,video,canvas,table{max-width:100%}
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+}
+@media(max-width:380px){nav .nav-item{min-width:58px}}

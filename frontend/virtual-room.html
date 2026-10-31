@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111827">
   <title>UpToSkill · Virtual Classroom</title>
   <link rel="icon" href="assets/favicon.png">
@@ -13,6 +13,8 @@
   <script src="virtual-room-config.js"></script>
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
@@ -24,23 +26,22 @@
   <header class="topbar">
     <a class="brand" href="index.html"><img src="assets/logo-icon.png" alt=""><span>UpTo<b>Skill</b></span></a>
     <div class="room-meta"><span class="live-dot"></span><span>Virtual classroom</span><code id="roomCodeLabel"></code></div>
-    <div class="top-actions"><button class="btn soft" id="shareBtn">Copy invite link</button><button class="btn danger" id="leaveBtn">Leave room</button></div>
+    <div class="top-actions"><button class="btn soft" id="shareBtn">Copy invite</button><button class="btn danger" id="leaveBtn">Leave</button></div>
   </header>
+
+  <nav class="mobile-nav" id="mobileNav" aria-label="Classroom sections">
+    <button data-go="video" class="on">Video</button><button data-go="code">Code</button><button data-go="notes">Notes</button><button data-go="board">Board</button><button data-go="chat">Chat</button>
+  </nav>
 
   <main class="layout">
     <section class="main-column">
-      <div class="panel video-panel">
+      <div class="panel video-panel" data-tab="video">
         <div class="panel-heading"><div><h1>Live session</h1><p id="videoStatus">Connecting to classroom services…</p></div><span class="participant-count" id="participantCount">0 participants</span></div>
         <div id="videoGrid" class="video-grid"><div class="video-placeholder" id="videoPlaceholder"><span class="placeholder-icon">◉</span><b>Camera tiles appear here</b><small>Allow camera and microphone access when prompted.</small></div></div>
-        <div class="media-controls">
-          <button class="media-btn" id="micBtn" aria-pressed="true"><span>🎙</span><b>Mute mic</b></button>
-          <button class="media-btn" id="cameraBtn" aria-pressed="true"><span>📷</span><b>Turn camera off</b></button>
-          <span class="media-hint" id="mediaHint">Your browser may ask for camera and microphone permission.</span>
-        </div>
       </div>
 
-      <div class="panel code-panel">
-        <div class="panel-heading"><div><h2>Shared code editor</h2><p>Changes sync live for everyone in this room.</p></div><div class="code-tools"><label class="sr-only" for="languageSelect">Programming language</label><select id="languageSelect"><option value="javascript">JavaScript</option><option value="text/x-csrc">C</option><option value="python">Python</option><option value="htmlmixed">HTML</option><option value="css">CSS</option></select><span id="syncStatus" class="sync-status">Connecting…</span></div></div>
+      <div class="panel code-panel" data-tab="code">
+        <div class="panel-heading"><div><h2>Shared code editor</h2><p>Changes sync live for everyone in this room.</p></div><div class="code-tools"><label class="sr-only" for="languageSelect">Programming language</label><select id="languageSelect"><option value="javascript">JavaScript</option><option value="python">Python</option><option value="text/x-java">Java</option><option value="text/x-csrc">C</option><option value="text/x-c++src">C++</option><option value="htmlmixed">HTML</option><option value="css">CSS</option></select><button class="btn primary small" id="runBtn" type="button">&#9654; Run</button><button class="btn soft small" id="copyCodeBtn" type="button">Copy</button><span id="syncStatus" class="sync-status">Connecting…</span></div></div>
         <textarea id="codeEditor" spellcheck="false">// Welcome to UpToSkill's shared editor
 function greet(name) {
   return `Hello, ${name}!`;
@@ -48,25 +49,40 @@ function greet(name) {
 
 console.log(greet('learner'));
 </textarea>
+        <div class="output-wrap" id="outputWrap" hidden><div class="output-head"><b>Output</b><button class="btn soft small" id="clearOutBtn" type="button">Close</button></div><pre id="codeOutput"></pre><iframe id="runFrame" title="Code preview" sandbox="allow-scripts" hidden></iframe></div>
       </div>
+
+      <section class="panel notes-panel" id="notesPanel" data-tab="notes">
+        <div class="panel-heading"><div><h2>Meeting notes</h2><p id="notesStatus">Saved automatically &middot; shared with everyone in this room</p></div>
+          <div class="notes-tools"><button class="btn soft small share-btn" id="notesShareBtn" type="button">Share screen</button><button class="btn soft small" id="notesDownloadBtn" type="button">Download</button><button class="btn primary small" id="notesFullBtn" type="button">Full screen</button></div></div>
+        <label class="sr-only" for="notesText">Meeting notes</label>
+        <textarea id="notesText" maxlength="30000" spellcheck="true" placeholder="Key points, steps, links, homework… Everything you type here is saved."></textarea>
+      </section>
     </section>
 
     <aside class="side-column">
-      <section class="panel board-panel">
+      <section class="panel board-panel" data-tab="board">
         <div class="panel-heading"><div><h2>Shared whiteboard</h2><p>Sketch a solution together.</p></div><button class="btn soft small" id="clearBoardBtn">Clear</button></div>
         <div class="board-tools"><label>Ink <input type="color" id="inkColor" value="#2563eb" aria-label="Ink color"></label><label>Width <input type="range" id="inkWidth" min="1" max="12" value="3" aria-label="Pen width"></label></div>
         <div class="canvas-wrap"><canvas id="whiteboard" aria-label="Collaborative whiteboard"></canvas></div>
         <p class="board-note">Draw with your mouse, trackpad or touch screen.</p>
       </section>
 
-      <section class="panel chat-panel">
+      <section class="panel chat-panel" data-tab="chat">
         <div class="panel-heading"><div><h2>Room chat</h2><p>Messages are shared with participants in this room.</p></div></div>
         <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
         <form id="chatForm" class="chat-form"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="500" placeholder="Ask a question…" autocomplete="off"><button class="btn primary" type="submit" aria-label="Send message">Send</button></form>
       </section>
-      <section class="panel people-panel"><div class="panel-heading"><div><h2>In this room</h2><p id="peopleSummary">Waiting for participants…</p></div></div><ul id="peopleList" class="people-list"></ul></section>
+      <section class="panel people-panel" data-tab="video"><div class="panel-heading"><div><h2>In this room</h2><p id="peopleSummary">Waiting for participants…</p></div></div><ul id="peopleList" class="people-list"></ul></section>
     </aside>
   </main>
+  <div class="control-dock" id="controlDock" role="toolbar" aria-label="Meeting controls">
+    <button class="media-btn" id="micBtn" aria-pressed="true"><span>🎙</span><b>Mute mic</b></button>
+    <button class="media-btn" id="cameraBtn" aria-pressed="true"><span>📷</span><b>Camera off</b></button>
+    <button class="media-btn share-btn" id="shareScreenBtn" aria-pressed="false"><span>🖥</span><b>Share screen</b></button>
+    <button class="media-btn" id="notesJumpBtn" type="button"><span>📝</span><b>Notes</b></button>
+  </div>
+  <p class="media-hint" id="mediaHint">Your browser may ask for camera and microphone permission.</p>
   <div id="audioDock" class="audio-dock" aria-hidden="true"></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="virtual-room.js" type="module"></script>

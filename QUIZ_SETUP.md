@@ -1,8 +1,8 @@
 # AI Quiz, Weak-Topic Help and Tutor Reports: setup
 
 ## What it does
-1. **Student finishes a lesson** -> a box offers a short quiz (or use *My Sessions > Past > Take quiz* any time).
-2. **Grok writes the quiz** (5 multiple-choice questions on the lesson topic). The right answers stay on the server until the student submits.
+1. **Student leaves the lesson** (leaves the virtual classroom, or presses Finish) -> a box asks if they want a short quiz. It is **optional**: *No thanks* skips it and nothing is generated or charged. The student can still start it later from *My Sessions > Past > Take quiz*. The box asks once per lesson.
+2. **Grok writes the quiz only after the student says yes** (5 multiple-choice questions on the topics covered; the student can edit the "What did you cover?" box first). The right answers stay on the server until the student submits.
 3. **Score = credits.** 60%+ earns 1 credit, 80%+ earns 2 credits (changeable in `.env`). One quiz per lesson, so credits cannot be farmed.
 4. **Low score (under 60%)**: no credits, and the AI coach shows the student their **weak topics** with a short explanation and a practice tip for each.
 5. **The AI writes a report about the student for the tutor** (weak topics, how often each was missed before, strengths, a plan for the next lesson, and an outline for a short video). It appears in the tutor app under **Student Reports** (with an unread badge).

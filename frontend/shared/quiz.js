@@ -65,11 +65,11 @@
   /* ====================================================================== STUDENT ====================================================================== */
   let hooks = { credits: () => { } };         // set by the student app: credits(quizId, amount, label)
 
-  async function startQuiz(session) {
+  async function startQuiz(session, covered) {
     loading("Writing your quiz with AI...");
-    handlers.retry = () => startQuiz(session);
+    handlers.retry = () => startQuiz(session, covered);
     try {
-      const r = await call("/quiz/start", { method: "POST", body: { sessionRef: String(session.ref), topic: session.skill || session.title, title: session.title || "", tutorEmail: session.mentorEmail || undefined } });
+      const r = await call("/quiz/start", { method: "POST", body: { sessionRef: String(session.ref || session.id), topic: session.skill || session.title, title: (covered || session.title || "").slice(0, 200), tutorEmail: session.mentorEmail || undefined } });
       if (r.done) return showResult(r.result);
       drawQuiz(r);
     } catch (e) { fail(e, e.code !== "AI_NOT_CONFIGURED" && e.code !== "QUIZ_LIMIT"); }
@@ -116,10 +116,15 @@
     };
   }
 
-  function offer(session, onLater) {
-    show(`<h3>Lesson complete!</h3><p>Take a short AI quiz on <b>${esc(session.skill || session.title)}</b> and earn up to 2 credits. If something was hard, the AI will explain it and your tutor can help.</p>
-      <div class="qz-row"><button class="btn orange" data-qz="take">Take the quiz now</button><button class="btn ghost" data-qz="close">Later</button></div>`, onLater);
-    handlers.take = () => { onClose = null; startQuiz(session); };
+  /* Asks first. Nothing is generated (and no AI call is made) until the student presses "Start quiz". */
+  function offer(session, opt) {
+    const manual = opt && opt.manual;
+    show(`<h3>${manual ? "Take a quiz" : "You left the lesson. Want a quick quiz?"}</h3>
+      <p>A short AI quiz on what you covered. Do well and earn up to 2 credits. If something was hard, the AI explains it and your tutor can help. <b>It is optional.</b></p>
+      <label>What did you cover in this lesson?<input class="qz-in" id="qz-cov" maxlength="120" value="${esc(session.title || session.skill || "")}"></label>
+      <p class="qz-mut">The quiz is made from these topics. Change them if the lesson went somewhere else.</p>
+      <div class="qz-row"><button class="btn orange" data-qz="take">Start quiz</button><button class="btn ghost" data-qz="close">${manual ? "Cancel" : "No thanks"}</button></div>`);
+    handlers.take = () => { const v = (ov.querySelector("#qz-cov").value || "").trim(); onClose = null; startQuiz(session, v || session.title); };
   }
 
   /* Student "Quizzes" page: history + videos from tutors. */

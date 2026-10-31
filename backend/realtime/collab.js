@@ -2,10 +2,12 @@ const ROOM_RE = /^uts-[A-Za-z0-9_-]{8,100}$/;
 const MAX_CHAT = 100;
 const MAX_STROKES = 500;
 const MAX_POINTS = 400;
+const LANGS = new Set(['javascript', 'python', 'text/x-java', 'text/x-csrc', 'text/x-c++src', 'htmlmixed', 'css']);
+const MAX_NOTES = 30000;
 const rooms = new Map();
 
 function stateFor(room) {
-  if (!rooms.has(room)) rooms.set(room, { code: '// Welcome to the shared editor\n', strokes: [], chat: [], members: new Map() });
+  if (!rooms.has(room)) rooms.set(room, { code: '// Welcome to the shared editor\n', lang: 'javascript', notes: '', strokes: [], chat: [], members: new Map() });
   return rooms.get(room);
 }
 function validRoom(room) { return typeof room === 'string' && ROOM_RE.test(room); }
@@ -25,6 +27,8 @@ export function attachCollaboration(io) {
       state.members.set(socket.id, { id: socket.id, name });
       socket.emit('room:state', {
         code: state.code,
+        lang: state.lang,
+        notes: state.notes,
         strokes: state.strokes,
         chat: state.chat,
         members: [...state.members.values()]
@@ -39,6 +43,23 @@ export function attachCollaboration(io) {
       const code = payload.code.slice(0, 100000);
       stateFor(room).code = code;
       socket.to(room).emit('code:change', { code, by: socket.id });
+    });
+
+    socket.on('code:lang', (payload = {}) => {
+      const room = socket.data.room;
+      if (!room || !validRoom(room) || !LANGS.has(payload.lang)) return;
+      stateFor(room).lang = payload.lang;
+      socket.to(room).emit('code:lang', { lang: payload.lang, by: socket.id });
+    });
+
+    // Meeting notes: shared by everyone in the room, kept on the server while the room lives.
+    socket.on('notes:change', (payload = {}, ack) => {
+      const room = socket.data.room;
+      if (!room || !validRoom(room) || typeof payload.text !== 'string') return;
+      const text = payload.text.slice(0, MAX_NOTES);
+      stateFor(room).notes = text;
+      socket.to(room).emit('notes:change', { text, by: socket.id });
+      if (typeof ack === 'function') ack({ ok: true });
     });
 
     socket.on('whiteboard:stroke', (payload = {}) => {

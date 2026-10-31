@@ -141,5 +141,12 @@
       .sort((a, b) => (b.msgs.at(-1)?.ts || 0) - (a.msgs.at(-1)?.ts || 0));
   }
 
-  window.UTSShared = { profiles, getProfile, setProfile, photoFromFile, squarePhoto, VIDEO, checkVideo, ratioOf, saveVideo, getVideo, removeVideo, notify, notifications, markRead, notifyTutor, tutorNotifications, markTutorRead, threadId, chatThread, chatSend, chatSeen, tutorThreads };
+  /* threads where this student is the first half of the id (tutor -> student messages), unread = tutor messages after the student last looked */
+  function studentThreads(studentEmail) {
+    const t = norm(studentEmail), all = rd(CK, {});
+    return Object.values(all).filter(c => c.id.split("|")[0] === t).map(c => ({ ...c, tutor: c.id.split("|")[1], unread: c.msgs.filter(m => m.from === "tutor" && m.ts > (c.seen.student || 0)).length }))
+      .sort((a, b) => (b.msgs.at(-1)?.ts || 0) - (a.msgs.at(-1)?.ts || 0));
+  }
+
+  window.UTSShared = { studentThreads, profiles, getProfile, setProfile, photoFromFile, squarePhoto, VIDEO, checkVideo, ratioOf, saveVideo, getVideo, removeVideo, notify, notifications, markRead, notifyTutor, tutorNotifications, markTutorRead, threadId, chatThread, chatSend, chatSeen, tutorThreads };
 })();

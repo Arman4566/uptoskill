@@ -187,8 +187,11 @@ const PAGES = {
       (list.length ? list.slice(0, 40).map(sessionCard).join("") : empty("Nothing here yet", "Accept a request or take an Instant Help call."));
   },
   messages() {
-    const th = UTSShared.tutorThreads(MYMAIL);
-    return head("Messages", "Learners can chat with you from their Recommended tutors list.") + (th.length ? th.map(threadCard).join("") : empty("No messages yet", "When a learner opens your card and taps Chat, the conversation shows up here."));
+    const th = UTSShared.tutorThreads(MYMAIL), learners = Object.values(S.users).filter(u => u.email);
+    const compose = `<div class="card pad"><b>Message a learner</b><p class="mut">${learners.length ? "Write to any learner who booked or messaged you. They see it under Messages in their app." : "Learners appear here after they book you or send you a message."}</p>
+      ${learners.length ? `<div class="row"><select class="in" id="nmTo" aria-label="Learner">${learners.map(u => `<option value="${esc(String(u.email).toLowerCase())}">${esc(u.name || u.email)}</option>`).join("")}</select>
+      <input class="in" id="nmText" maxlength="500" placeholder="Write your message" aria-label="Message" style="flex:1;min-width:160px"><button class="btn" data-act="newmsg">${icon("send", 16)} Send</button></div>` : ""}</div>`;
+    return head("Messages", "Chat with your learners. Learners can also message you from their Recommended tutors list.") + compose + (th.length ? th.map(threadCard).join("") : empty("No messages yet", "When a learner opens your card and taps Chat, the conversation shows up here."));
   },
   availability() {
     const slots = S.slots.slice().sort((a, b) => a.start - b.start).filter(x => x.end > Date.now() - DAY), days = {};
@@ -263,7 +266,7 @@ const PAGES = {
   }
 };
 function threadCard(c) {
-  const name = (c.msgs.find(m => m.from === "student") || {}).name || c.student, id = esc(c.id);
+  const known = Object.values(S.users).find(u => u.email && String(u.email).toLowerCase() === c.student), name = (c.msgs.find(m => m.from === "student") || {}).name || (known && known.name) || c.student, id = esc(c.id);
   return `<div class="card pad thread"><div class="row">${av(name, 40)}<div style="flex:1"><b>${esc(name)}</b><div class="mut">${esc(c.student)}</div></div>${c.unread ? `<span class="chip o">${c.unread} new</span>` : ""}</div>
     <div class="msgs" style="height:200px">${c.msgs.map(m => `<div class="msg ${m.from === "tutor" ? "mine" : ""}"><small>${m.from === "tutor" ? "You" : esc(m.name)} · ${clock(m.ts)}</small>${esc(m.text)}</div>`).join("")}</div>
     <div class="row"><input class="in" data-reply="${id}" maxlength="500" placeholder="Write a reply and press Enter" aria-label="Reply to ${esc(name)}"><button class="btn" data-act="msgsend" data-id="${id}">${icon("send", 16)} Reply</button></div></div>`;
@@ -317,6 +320,20 @@ const ACT = {
   msgsend: id => {
     const sel = () => document.querySelector(`input[data-reply="${CSS.escape(id)}"]`), inp = sel(), v = inp ? inp.value.trim() : ""; if (!v) return;
     UTSShared.chatSend(id, "tutor", S.me.name, v); go("messages", null, true); const again = sel(); if (again) again.focus();
+  },
+  newmsg: () => {
+    const to = ($("#nmTo") || {}).value, v = (($("#nmText") || {}).value || "").trim();
+    if (!to) return toast("Choose a learner first."); if (!v) return toast("Write a message first.");
+    if (!UTSShared.chatSend(UTSShared.threadId(to, MYMAIL), "tutor", S.me.name, v)) return toast("Could not send. Try again.");
+    toast("Message sent."); go("messages", null, true);
+  },
+  rvstar: (id, b) => { RV.stars = +b.dataset.r; document.querySelectorAll('[data-act="rvstar"]').forEach(x => x.classList.toggle("orange", +x.dataset.r <= RV.stars)); },
+  rvsend: () => {
+    if (!RV.stars) return toast("Choose 1 to 5 stars first.");
+    const text = (($("#rvtext") || {}).value || "").trim().slice(0, 400), s = S.sessions.find(x => x.ref === RV.ref);
+    if (s) s.learnerReview = { stars: RV.stars, text, ts: Date.now() };
+    save(); if (RV.peer) UTSShared.notify(RV.peer, { kind: "learner_review", title: `${S.me.name} reviewed you`, body: `${RV.stars}★${text ? " - " + text : ""}` });
+    closeModal(); toast("Thanks! Your review was sent.");
   },
   photogal: () => $("#f-photo-gal").click(),
   photocam: () => { if (window.matchMedia && matchMedia("(pointer: coarse)").matches) $("#f-photo-cam").click(); else openWebcam(); },
@@ -377,7 +394,7 @@ const ACT = {
       try { localStorage.setItem(roomKey, room); } catch { }
     }
     const api = window.UPTOSKILL_API_URL || "";
-    const url = "../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.me.name) + "&role=tutor" + (api ? "&api=" + encodeURIComponent(api) : "");
+    const url = "../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.me.name) + "&role=tutor&ref=" + encodeURIComponent(s.ref || "") + "&peer=" + encodeURIComponent(learnerEmail(s.learnerId) || "") + "&pn=" + encodeURIComponent(user(s.learnerId).name || "") + (api ? "&api=" + encodeURIComponent(api) : "");
     window.open(url, "_blank", "noopener");
   },
   notes: id => {
@@ -464,7 +481,7 @@ function checkStudentNotifs() {
       lines.push([`${name} cancelled a session`, `“${s.title}” was cancelled by the learner. Their credits were refunded.`]);
     } else if (n.kind === "rating") {
       const s = byRef(n.ref); if (!s) return;
-      s.pendingRating = n.stars;                                                     // counted when the session is completed
+      s.pendingRating = n.stars; if (n.comment) s.pendingComment = n.comment;                                                     // counted when the session is completed
       if (s.status === "completed") s.rateAt = Date.now() + 200;
     } else if (n.kind === "delay") {
       const s = byRef(n.ref, "requested", "accepted") || S.sessions.filter(x => x.status === "accepted" && learnerEmail(x.learnerId) === n.fromStudent).sort((a, b) => Math.abs(a.slotTs - n.fromTs) - Math.abs(b.slotTs - n.fromTs))[0];
@@ -500,4 +517,18 @@ window.addEventListener("uts-change", () => { if (!learnerMode) refresh(); });
   const h = location.hash.slice(1).split("/"), start = PAGES[h[0]] && h[0] !== "room" ? h[0] : "dashboard"; syncPublic(); go(start); checkStudentNotifs();
   if (window.UTSQuiz) UTSQuiz.pollTutor(n => { const more = n > quizUnread; quizUnread = n; renderNav(); if (more && page !== "reports") toast(`New AI report about a student (${n} unread). Open Student Reports.`); });
   setInterval(tick, 1000);
+})();
+
+/* ---------- review the learner after a classroom (the room sends you back with ?review=1&ref=...&peer=...) ---------- */
+const RV = { stars: 0, ref: "", peer: "" };
+(function openReviewFromUrl() {
+  const q = new URLSearchParams(location.search); if (q.get("review") !== "1") return;
+  history.replaceState(null, "", location.pathname);
+  const ref = q.get("ref") || "", peer = q.get("peer") || "", pn = q.get("pn") || "your learner";
+  if (!S.sessions.some(x => x.ref === ref)) return;
+  Object.assign(RV, { stars: 0, ref, peer });
+  modal(`<h3>How was the session with ${esc(pn)}?</h3><p class="mut">Rate your learner. Your review is sent to them right away.</p>
+    <div class="row">${[1, 2, 3, 4, 5].map(n => `<button class="btn ghost" data-act="rvstar" data-r="${n}">${n}★</button>`).join("")}</div>
+    <label class="f" style="margin-top:10px">Comment (optional)<textarea class="in" id="rvtext" maxlength="400" rows="3" placeholder="How well did they prepare? What should they practise?"></textarea></label>
+    <div class="row"><button class="btn ghost" data-act="close">Skip</button><button class="btn" data-act="rvsend">Send review</button></div>`);
 })();

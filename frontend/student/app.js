@@ -79,7 +79,7 @@ let page = "dashboard", tab = "upcoming", quizNew = 0;
 function toast(m) { const t = $("#toast"); t.textContent = m; t.className = "on"; clearTimeout(toast.h); toast.h = setTimeout(() => t.className = "", 2400); }
 function modal(h) { $("#modal").innerHTML = `<div class="mod">${h}</div>`; $("#modal").hidden = false; }
 let chatWith = null;
-function closeModal() { chatWith = null; $("#modal").hidden = true; }
+function closeModal() { chatWith = null; $("#modal").hidden = true; if (typeof RV !== "undefined" && RV.open) releaseQuiz(); }
 
 /* ---------- icons ---------- */
 const P = {
@@ -101,8 +101,8 @@ const P = {
   cap: '<path d="M22 10L12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>',
   chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.3L4 21l1.5-4.5A8.4 8.4 0 1 1 21 11.5z"/>',
   send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
-  quiz: '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',
-  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>'
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
+  quiz: '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>'
 };
 const icon = (n, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${P[n]}</svg>`;
 
@@ -131,7 +131,9 @@ function streakHTML() {
 function menu() {
   const m = [["dashboard", "Dashboard", "grid"], ["find", "Find Mentors", "search"], ["sessions", "My Sessions", "cal"], ["instant", "Instant Help", "bolt"],
     ["quizzes", "Quizzes" + (quizNew ? ` (${quizNew})` : ""), "quiz"], ["board", "Doubt Board", "help"], ["ledger", "Credits & Ledger", "wallet"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
-  if (S.user.mentor) m.splice(3, 0, ["requests", `Session Requests (${S.incoming.length})`, "inbox"]);
+  const unread = window.UTSShared && window.UTS ? UTSShared.studentThreads(UTS.email).reduce((n, c) => n + c.unread, 0) : 0;
+  m.splice(2, 0, ["messages", "Messages" + (unread ? ` (${unread})` : ""), "chat"]);
+  if (S.user.mentor) m.splice(4, 0, ["requests", `Session Requests (${S.incoming.length})`, "inbox"]);
   return m;
 }
 function renderNav() {
@@ -144,8 +146,8 @@ function go(id) {
   Lift.closeNow();                                  // the page below is about to be redrawn
   page = id; if (window.UTSBack) UTSBack.note(id); renderNav();
   $("#main").innerHTML = PAGES[id]();
-  if (id === "dashboard" || id === "find") updateTutors();
   if (id === "quizzes" && window.UTSQuiz) UTSQuiz.studentPage($("#quizpage")).then(() => { quizNew = 0; renderNav(); });
+  if (id === "dashboard" || id === "find") updateTutors();
   window.scrollTo(0, 0);
 }
 
@@ -242,12 +244,23 @@ const PAGES = {
       <div><button class="btn ${S.user.mentor ? "orange" : ""}" data-act="mentor">${S.user.mentor ? "Mentor mode is ON - turn off" : "Turn on mentor mode"}</button></div></div>
 `;
   },
+  messages() {
+    const th = window.UTSShared ? UTSShared.studentThreads(UTS.email) : [];
+    return head("Messages", "Chats with your mentors. Tutors can message you here too.") +
+      (th.length ? th.map(c => { const t = tutorById(c.tutor), last = c.msgs.at(-1);
+        return `<div class="card lec"><div class="info"><div class="t">${esc(t ? t.name : c.tutor)} ${c.unread ? `<span class="chip o">${c.unread} new</span>` : ""}</div><div class="w">${last ? esc((last.from === "tutor" ? "" : "You: ") + last.text.slice(0, 90)) : ""}</div></div>
+          <button class="btn" data-act="chat" data-id="${esc(c.tutor)}">${icon("chat", 18)} Open chat</button></div>`; }).join("")
+        : `<div class="empty"><b>No messages yet</b>Open Find Mentors and tap Chat on a mentor, or wait for a mentor to write to you.</div>`);
+  },
   requests() {
-    return head("Session Requests", "Accept a request to earn its credits.") +
+    const acc = (S.mentorSessions || []).filter(m => m.status === "accepted");
+    return head("Session Requests", "Accept a request, open the classroom at the booked time, and you are paid when the learner finishes the session.") +
       (S.incoming.length ? S.incoming.map(r => `<div class="card lec"><div class="info"><div class="t">${esc(r.topic)}</div><div class="w">from ${esc(r.student)}</div>
         <div class="m"><span class="chip">${r.min} min</span><span class="chip o">${r.credits} credits</span></div></div>
         <button class="btn" data-act="accept" data-id="${r.id}">Accept</button><button class="btn ghost" data-act="decline" data-id="${r.id}">Decline</button></div>`).join("")
-        : `<div class="empty"><b>No pending requests</b>New requests will show up here.</div>`);
+        : `<div class="empty"><b>No pending requests</b>${S.user.skills.length ? "Learners who book you will show up here." : "Add skills in Profile so learners can find you."}</div>`) +
+      (acc.length ? `<h2 style="margin-top:8px">Accepted sessions</h2>` + acc.map(m => `<div class="card lec"><div class="info"><div class="t">${esc(m.topic)}</div><div class="w">with ${esc(m.student)} · ${m.min} min · ${m.credits} credits</div></div>
+        <button class="btn" data-act="mentorroom" data-id="${m.id}">${icon("video", 18)} Open classroom</button></div>`).join("") : "");
   }
 };
 
@@ -394,6 +407,7 @@ const ACT = {
     closeModal(); tab = "upcoming"; toast(`Request sent to ${t.name.split(" ")[0]}. Credits held in escrow.`); go("sessions");
   },
   close: closeModal,
+  quiz: id => { const s = S.sessions.find(x => x.id == id); if (s && s.status === "completed") UTSQuiz.offer(s, { manual: true }); },
   cancel: id => {
     const s = S.sessions.find(x => x.id == id); if (!s || !(s.status === "requested" || s.status === "accepted")) return;
     s.status = "cancelled"; S.credits = round2(S.credits + s.credits); log(`Refund: ${s.title}`, s.credits);
@@ -403,7 +417,7 @@ const ACT = {
   join: id => {
     const s = S.sessions.find(x => x.id == id); if (!s) return toast("Session not found.");
     modal(`<h3>Join virtual classroom</h3><p class="mut">${esc(s.title)} · with ${esc(s.mentor)}</p>
-      <label class="f">Room code or invite link<input class="in" id="roomInviteInput" maxlength="500" value="" placeholder="Paste the tutor's invite link or room code"></label>
+      <label class="f">Room code or invite link<input class="in" id="roomInviteInput" maxlength="500" value="${esc(s.room || "")}" placeholder="Paste the tutor's invite link or room code"></label>
       <p class="mut">Paste the invite link or room code shared by your tutor to join the same room.</p>
       <div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="openroom" data-id="${id}">${icon("video", 18)} Join room</button></div>
       <hr style="border:0;border-top:1px solid var(--line);margin:14px 0"><p class="mut">Lesson finished? End the session and rate your mentor:</p>
@@ -417,17 +431,14 @@ const ACT = {
     try { if (/^https?:\/\//i.test(room)) room = new URL(room).searchParams.get("room") || ""; } catch { room = ""; }
     if (!/^uts-[A-Za-z0-9_-]{8,100}$/.test(room)) return toast("Enter a valid room code or invite link.");
     const api = window.UPTOSKILL_API_URL || "";
-    window.open("../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.user.name) + "&role=student" + (api ? "&api=" + encodeURIComponent(api) : ""), "_blank", "noopener");
+    window.open("../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.user.name) + "&role=student&sid=" + encodeURIComponent(s.id) + "&ref=" + encodeURIComponent(s.ref || "") + "&peer=" + encodeURIComponent(s.mentorEmail || "") + "&pn=" + encodeURIComponent(s.mentor) + (api ? "&api=" + encodeURIComponent(api) : ""), "_blank", "noopener");
     closeModal();
   },
-  quiz: id => { const s = S.sessions.find(x => x.id == id); if (s && s.status === "completed") UTSQuiz.start(s); },
   finish: (id, b) => {
     const s = S.sessions.find(x => x.id == id); if (!s || s.status !== "accepted") return toast("Only an accepted session can be finished.");
-    s.status = "completed"; s.rating = +b.dataset.r;
-    S.done++; S.mins += s.min; tick(); log(`Session with ${s.mentor}`, 0); save(); closeModal();
-    if (s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "rating", ref: s.ref, stars: s.rating, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
+    completeSession(s, +b.dataset.r, ""); closeModal();
     toast(`Session complete! Streak: ${S.streak.days} day${S.streak.days > 1 ? "s" : ""}`); tab = "past"; go("sessions");
-    if (window.UTSQuiz) UTSQuiz.offer(s);
+    askQuiz(s);
   },
   instantgo: () => {
     const topic = $("#it").value.trim(); if (!topic) return toast("Tell us what you are stuck on");
@@ -445,15 +456,40 @@ const ACT = {
     S.doubts.find(d => d.id == id).replies.push({ by: S.user.name, text: v }); save(); go("board");
   },
   solve: id => { S.doubts.find(d => d.id == id).solved = true; save(); toast("Marked as solved"); go("board"); },
-  savename: () => { const v = $("#pn").value.trim(); if (v) { S.user.name = v; save(); toast("Name saved"); go("profile"); } },
-  addskill: () => { const v = $("#ps").value.trim(); if (v) { S.user.skills.push(v); save(); go("profile"); } },
-  rmskill: id => { S.user.skills.splice(+id, 1); save(); go("profile"); },
-  mentor: () => { S.user.mentor = !S.user.mentor; save(); toast(S.user.mentor ? "Mentor mode on" : "Mentor mode off"); go("profile"); },
+  savename: () => { const v = $("#pn").value.trim(); if (v) { S.user.name = v; save(); publishMentor(); toast("Name saved"); go("profile"); } },
+  addskill: () => { const v = $("#ps").value.trim(); if (v) { S.user.skills.push(v); save(); publishMentor(); go("profile"); } },
+  rmskill: id => { S.user.skills.splice(+id, 1); save(); publishMentor(); go("profile"); },
+  mentor: () => { S.user.mentor = !S.user.mentor; if (S.user.mentor && !S.user.skills.length) toast("Add at least one skill below so learners can find you."); save(); publishMentor(); toast(S.user.mentor ? "Mentor mode on" : "Mentor mode off"); go("profile"); },
   accept: id => {
-    const r = S.incoming.find(x => x.id == id); S.credits += r.credits; log(`Earned: ${r.topic} (${r.student})`, r.credits);
-    S.incoming = S.incoming.filter(x => x.id != id); save(); toast(`Accepted. +${r.credits} credits earned`); go("requests");
+    const r = S.incoming.find(x => x.id == id); if (!r) return;
+    S.incoming = S.incoming.filter(x => x.id != id); r.status = "accepted"; r.room = roomFor(r.ref);
+    (S.mentorSessions = S.mentorSessions || []).push(r); save();
+    UTSShared.notify(r.studentEmail, { kind: "booking_accepted", ref: r.ref, room: r.room, mentor: S.user.name, title: "Session accepted", body: `${S.user.name} accepted “${r.topic}”. Open My Sessions and tap Join room.` });
+    toast("Accepted. Open the classroom when it is time."); go("requests");
   },
-  decline: id => { S.incoming = S.incoming.filter(x => x.id != id); save(); go("requests"); },
+  decline: id => {
+    const r = S.incoming.find(x => x.id == id); if (!r) return;
+    S.incoming = S.incoming.filter(x => x.id != id); save();
+    UTSShared.notify(r.studentEmail, { kind: "booking_declined", ref: r.ref, title: "Session declined", body: `${S.user.name} could not take “${r.topic}”. Your credits were refunded.` });
+    go("requests");
+  },
+  mentorroom: id => {
+    const m = (S.mentorSessions || []).find(x => x.id == id); if (!m) return;
+    const api = window.UPTOSKILL_API_URL || "";
+    window.open("../virtual-room.html?room=" + encodeURIComponent(m.room || roomFor(m.ref)) + "&name=" + encodeURIComponent(S.user.name) + "&role=student&ref=" + encodeURIComponent(m.ref) + "&peer=" + encodeURIComponent(m.studentEmail || "") + "&pn=" + encodeURIComponent(m.student) + (api ? "&api=" + encodeURIComponent(api) : ""), "_blank", "noopener");
+  },
+  rvstar: (id, b) => { RV.stars = +b.dataset.r; document.querySelectorAll('[data-act="rvstar"]').forEach(x => x.classList.toggle("orange", +x.dataset.r <= RV.stars)); },
+  rvsend: () => {
+    if (!RV.stars) return toast("Choose 1 to 5 stars first.");
+    const text = (($("#rvtext") || {}).value || "").trim().slice(0, 400);
+    if (RV.kind === "mentor") { const s = S.sessions.find(x => x.ref === RV.ref); if (s) completeSession(s, RV.stars, text); }
+    else {
+      const m = (S.mentorSessions || []).find(x => x.ref === RV.ref);
+      if (m) { m.learnerReview = { stars: RV.stars, text }; save(); }
+      if (RV.peer) UTSShared.notify(RV.peer, { kind: "learner_review", title: `${S.user.name} reviewed you`, body: `${RV.stars}★${text ? " - " + text : ""}` });
+    }
+    closeModal(); toast("Thanks! Your review was sent."); go(page);
+  },
   logout: () => UTSAuth.logout("login.html"),
 };
 
@@ -488,7 +524,7 @@ function checkNotifs() {
                 S.sessions.find(x => (x.status === "accepted" || x.status === "requested") && x.mentor === n.mentor);
       if (s) { s.day = dayLabel(n.toTs); s.time = clockLabel(n.toTs); s.ts = n.toTs; }
     } else if (n.kind === "booking_accepted") {
-      const s = S.sessions.find(x => x.ref === n.ref && x.status === "requested"); if (s) s.status = "accepted";
+      const s = S.sessions.find(x => x.ref === n.ref && x.status === "requested"); if (s) { s.status = "accepted"; if (n.room) s.room = n.room; }
     } else if (n.kind === "booking_declined" || n.kind === "booking_cancelled") {   // the tutor said no (or cancelled): credits come back
       const s = open(n.ref); if (s) { s.status = "cancelled"; S.credits = round2(S.credits + s.credits); log(`Refund: ${s.title}`, s.credits); }
     }
@@ -500,19 +536,106 @@ function checkNotifs() {
 }
 window.addEventListener("storage", e => {
   if (e.key === "uts_notifs") checkNotifs();
+  if (e.key === "uts_tnotifs") checkMentorNotifs();
+  if (e.key === "uts_chats") { if (page === "messages" && !chatWith && !document.activeElement?.matches?.("input,textarea")) go("messages"); else renderNav(); }
   if (e.key === "uts_chats" && chatWith) { const t = tutorById(chatWith); if (t) drawChat(t); }
 });
+
+/* ---------- student as mentor: publish a public profile, receive bookings, get paid on completion ---------- */
+const roomFor = ref => "uts-" + ("m" + String(ref)).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60).padEnd(8, "0");
+function publishMentor() {
+  if (!window.UTSShared || !window.UTS) return;
+  const prof = UTSShared.getProfile(UTS.email);
+  if (!S.user.mentor) { if (prof.pub) UTSShared.setProfile(UTS.email, { pub: null }); return; }
+  const st = S.mentorStats = S.mentorStats || { sum: 0, count: 0, sessions: 0 };
+  S.user.mentorSince = S.user.mentorSince || Date.now();
+  const pub = { name: S.user.name, bio: S.user.bio || "Peer mentor", level: Math.max(2, S.user.level || 1), levelName: S.user.level >= 2 ? S.user.levelName : "Helper",
+    skills: (S.user.skills || []).map(n => ({ n })), langs: ["English", "Hindi"], rating: st.count ? +(st.sum / st.count).toFixed(1) : 0, reviews: st.count, sessions: st.sessions, since: S.user.mentorSince, slots: [] };
+  if (!prof.pub || JSON.stringify(prof.pub) !== JSON.stringify(pub)) UTSShared.setProfile(UTS.email, { pub });
+}
+function checkMentorNotifs() {
+  if (!window.UTSShared || !window.UTS || !S.user.mentor) return;
+  const un = UTSShared.tutorNotifications(UTS.email).filter(n => !n.read); if (!un.length) return;
+  S.handled = S.handled || []; S.mentorSessions = S.mentorSessions || [];
+  const lines = [];
+  un.forEach(n => {
+    if (S.handled.includes(n.id)) return; S.handled.push(n.id);
+    const name = n.studentName || "A learner";
+    if (n.kind === "booking") {
+      if (S.incoming.some(x => x.ref === n.ref) || S.mentorSessions.some(x => x.ref === n.ref)) return;
+      S.incoming.push({ id: S.nid++, ref: n.ref, topic: n.title, student: name, studentEmail: n.fromStudent, min: n.minutes, credits: n.credits, ts: n.ts, instant: !!n.instant });
+      lines.push([`New request from ${name}`, `“${n.title}” · ${n.minutes} min · ${n.credits} credits. Open Session Requests to accept or decline.`]);
+    } else if (n.kind === "cancel") {
+      S.incoming = S.incoming.filter(x => x.ref !== n.ref);
+      const m = S.mentorSessions.find(x => x.ref === n.ref && x.status === "accepted"); if (m) m.status = "cancelled";
+      lines.push([`${name} cancelled a session`, `“${n.sessionTitle || "A session"}” was cancelled by the learner.`]);
+    } else if (n.kind === "rating") {                                              // the learner finished the session: the mentor is paid now
+      const m = S.mentorSessions.find(x => x.ref === n.ref); if (!m || m.status === "completed") return;
+      m.status = "completed"; m.review = { stars: n.stars, text: n.comment || "" };
+      const st = S.mentorStats = S.mentorStats || { sum: 0, count: 0, sessions: 0 }; st.sum += n.stars; st.count++; st.sessions++;
+      S.credits = round2(S.credits + m.credits); log(`Earned: ${m.topic} (${m.student})`, m.credits);
+      lines.push([`${name} finished the session`, `You earned ${m.credits} credits and a ${n.stars}★ review${n.comment ? ": " + n.comment : "."}`]);
+    }
+  });
+  save(); UTSShared.markTutorRead(UTS.email); publishMentor();
+  if (!lines.length) return;
+  modal(`<h3>Mentor notifications</h3><div class="nf">${lines.map(l => `<div class="rep"><b>${esc(l[0])}</b><br>${esc(l[1])}</div>`).join("")}</div><div class="row"><button class="btn" data-act="close">Got it</button></div>`);
+  rerender();
+}
+
+/* ---------- review after a classroom (the room sends people back here with ?review=1&ref=...&peer=...) ---------- */
+const LAUNCH_Q = new URLSearchParams(location.search);          // read once at load: both the review window and the quiz offer use it
+const RV = { stars: 0, kind: "mentor", ref: "", peer: "", open: false };
+function completeSession(s, stars, comment) {
+  if (s.status === "accepted") { s.status = "completed"; S.done++; S.mins += s.min; tick(); log(`Session with ${s.mentor}`, 0); }
+  s.rating = stars; s.review = comment; save();
+  if (s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "rating", ref: s.ref, stars, comment, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
+}
+function openReviewFromUrl() {
+  const q = LAUNCH_Q; if (q.get("review") !== "1") return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  const ref = q.get("ref") || "", peer = q.get("peer") || "", pn = q.get("pn") || "your partner";
+  const asLearner = S.sessions.some(x => x.ref === ref), asMentor = (S.mentorSessions || []).some(x => x.ref === ref);
+  if (!asLearner && !asMentor) return;
+  Object.assign(RV, { stars: 0, kind: asLearner ? "mentor" : "learner", ref, peer, open: true });
+  modal(`<h3>How was the session with ${esc(pn)}?</h3><p class="mut">${asLearner ? "Rate your mentor." : "Rate your learner."} Your review is sent to them right away.</p>
+    <div class="row">${[1, 2, 3, 4, 5].map(n => `<button class="btn ghost" data-act="rvstar" data-r="${n}">${n}★</button>`).join("")}</div>
+    <label class="f" style="margin-top:10px">Comment (optional)<textarea class="in" id="rvtext" maxlength="400" rows="3" placeholder="What went well? What could be better?"></textarea></label>
+    <div class="row"><button class="btn ghost" data-act="close">Skip</button><button class="btn" data-act="rvsend">Send review</button></div>`);
+}
 window.addEventListener("uts-theme", renderNav);
 
 /* ---------- AI quiz (shared/quiz.js) ---------- */
-if (window.UTSQuiz) {
+/* The quiz is only offered when the student LEAVES a lesson (leaves the classroom, or finishes the session), once per lesson.
+   It is optional: "No thanks" skips it, and nothing is generated until the student says yes.
+   If the review window is open at that moment, the quiz offer waits until the review is sent or skipped (two dialogs never stack). */
+let quizWait = null;
+function askQuiz(s) {
+  if (!window.UTSQuiz || !s) return;
+  S.quizAsked = S.quizAsked || [];
+  const key = String(s.ref || s.id);
+  if (S.quizAsked.includes(key)) return;
+  S.quizAsked.push(key); save();
+  if (RV.open) { quizWait = s; return; }
+  UTSQuiz.offer(s);
+}
+function releaseQuiz() {
+  RV.open = false;
+  if (quizWait) { const s = quizWait; quizWait = null; setTimeout(() => UTSQuiz.offer(s), 350); }
+}
+function startQuizFeatures() {
+  if (!window.UTSQuiz) return;
+  const back = LAUNCH_Q.get("quiz");                                  // set by the classroom when the student leaves it
+  if (back) { history.replaceState(null, "", location.pathname + location.hash); const s = S.sessions.find(x => String(x.id) === back); if (s) setTimeout(() => askQuiz(s), 600); }
   S.quizPaid = S.quizPaid || [];
-  UTSQuiz.setHooks({ credits: (qid, n, label) => {          // the server already paid its ledger once; this keeps the app's balance in step, once per quiz
+  UTSQuiz.setHooks({ credits: (qid, n, label) => {                    // the server already paid its ledger once; this keeps the app's balance in step, once per quiz
     if (S.quizPaid.includes(qid)) return; S.quizPaid.push(qid); S.credits = round2(S.credits + n); log(label, n); save(); toast(`+${n} credit${n > 1 ? "s" : ""} for the quiz!`); renderNav();
     if (page === "dashboard" || page === "ledger") go(page);
   } });
   const pollVideos = async () => { const n = await UTSQuiz.unseenVideos(); if (n !== quizNew && page !== "quizzes") { quizNew = n; renderNav(); } };
   pollVideos(); setInterval(pollVideos, 60000);
 }
+
 go("dashboard");
+publishMentor(); checkMentorNotifs(); openReviewFromUrl(); startQuizFeatures();
 checkNotifs();

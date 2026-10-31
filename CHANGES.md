@@ -95,9 +95,30 @@ The update was built on an older snapshot (no mentors/slots routes, no `back.js`
 - The old simulated "live room" in the tutor app still works only inside one browser; use the virtual classroom for real calls.
 - The `backend/.env` in the zip still holds real-looking secrets: rotate the database password, `JWT_SECRET` and LiveKit keys, and keep `.env` out of any zip you share.
 
-## Round 7 (AI quiz, weak-topic help, tutor reports, short videos)
-See `QUIZ_SETUP.md` for what it does and how to set it up.
-- Backend: Grok client (`services/grok.js`), quiz logic (`services/quiz.js`), routes under `/quiz`, new tables `quizzes`, `student_reports`, `remedial_videos`, new credit reason `quiz_reward`. No new npm packages.
-- Student app: "Take quiz" on finished lessons, an offer right after Finish, a new **Quizzes** page (history, videos from tutors, badge for new videos).
-- Tutor app: new **Student Reports** page (AI report per low-scoring student, repeat-miss counts, suggested plan, video outline, record/upload a short video) with an unread badge.
-- `backend/.env.example` re-added with placeholders (it was missing from the zip) and the Grok settings.
+## Round 7 (virtual classroom: editor, notes, screen share, mobile)
+- **Code editor fixed**: remote edits were sent straight back to the server (echo), which overwrote what you were typing and moved the cursor. Now remote changes are applied as a small diff without re-sending, and a local edit that is about to be sent is never overwritten. Also: language is synced for everyone, Java and C++ added, auto-close brackets, Tab indent, Run button (JavaScript console output, HTML/CSS live preview), Copy button.
+- **Meeting notes**: new panel with **Full screen** (Esc to exit), autosave (browser + server, restored when you rejoin), shared live with the room, Download as .txt, and a **Share screen** button inside it.
+- **Share screen** (LiveKit): button in the bottom dock and in notes; screen shows as a wide tile for everyone; the browser's own "Stop sharing" is handled. Hidden on phones, where browsers cannot share a screen.
+- **Audio bugs fixed**: you could hear your own microphone, and remote voices could be attached twice. Camera-off now removes your tile.
+- **Mobile**: section tabs (Video / Code / Notes / Board / Chat), bottom control dock with big touch buttons, safe-area support, 16px inputs (no iOS zoom), notes full screen works on phones.
+- Backend: `realtime/collab.js` handles `notes:change` and `code:lang` (validated, size-limited).
+
+
+## Round 8 (reviews, student-as-mentor, tutor messages, mobile dashboards)
+- **Review for both sides**: leaving the classroom now sends the tutor and the learner back to their dashboard with a review window (stars + comment) for the other person. The learner's review completes the session and pays the mentor; the mentor's review reaches the learner as a notification. Room links no longer carry review info to invitees.
+- **Student as mentor**: turning Mentor mode on publishes a public profile (level 2+, your skills), so other students find you in Find Mentors. Bookings arrive in Session Requests; Accept sends the learner a notification with the classroom code (pre-filled in their Join dialog), Decline refunds them. "Open classroom" opens the room. Credits are paid when the learner finishes and reviews. Add at least one skill in Profile first.
+- **Tutor -> learner messages**: Messages page has "Message a learner" (every learner who booked or wrote to you). Learners get a new **Messages** page with an unread badge.
+- **Mobile dashboards**: `shared/mobile.css` (student + tutor apps): bottom swipe bar with log out, full-width content, bottom-sheet dialogs, 16px inputs, big tap targets.
+
+
+## Round 9 (merge of the AI quiz update into Round 8)
+The quiz update was built on the Round 6 snapshot (before the classroom editor/notes, reviews, student-as-mentor and mobile dashboards), so it was merged by hand into the latest version instead of copied over. Nothing from Round 7 or 8 was removed.
+- Added from the quiz update: `backend/services/grok.js`, `backend/services/quiz.js`, `backend/routes/quiz.js`, `frontend/shared/quiz.js`, `QUIZ_SETUP.md`, `backend/.env.example` (placeholders only). `app.js` mounts `/quiz`; `schema.sql` gets the `quiz_reward` ledger reason and the tables `quizzes`, `student_reports`, `remedial_videos` (safe to re-run with `npm run db:migrate`).
+- Student app: **Quizzes** page, "Take quiz" on finished lessons, quiz offer when the student leaves a lesson. Tutor app: **Student Reports** page with unread badge.
+- Clash fixes:
+  - **Review window vs quiz**: leaving the classroom now opens the review window and, once it is sent or skipped, the optional quiz offer (the two dialogs never show at the same time). The quiz code used to wipe the `?review=...` URL parameters before the review window could read them; both now use one copy of the parameters read at page load.
+  - **Classroom leave link**: the room link carries the lesson id (`sid`) for the student's own lesson only; leave builds `?review=1&ref=...&quiz=<id>`. The invite link strips `sid` so invitees never get a quiz.
+  - **Finish dialog**: the "Join room / rate your mentor" dialog stayed open after pressing a star (the Round 8 review refactor dropped `closeModal()`). It closes again, and the quiz offer follows.
+  - Student menu: Quizzes sits next to Instant Help; it does not move Messages / Session Requests.
+  - Kept from Round 7 and 8: editor / notes / screen share, reviews for both sides, student-as-mentor, tutor messages to learners, `mobile.css`, viewport-fit for phones.
+  - Quiz stores one quiz per lesson using the lesson `ref` (falls back to the lesson id if a lesson has none).
