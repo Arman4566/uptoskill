@@ -10,7 +10,8 @@
     "db:reset": "node db/migrate.js --reset",
     "db:seed": "node db/seed.js",
     "db:purge-demo": "node db/purge-demo.js",
-    "test:race": "node scripts/race-test.js"
+    "test:race": "node scripts/race-test.js",
+    "events:now": "node scripts/events-now.js"
   },
   "engines": {
     "node": ">=18.11"
@@ -24,6 +25,7 @@
     "livekit-server-sdk": "^2.13.3",
     "pg": "^8.12.0",
     "socket.io": "^4.8.1",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8"
   }
 }

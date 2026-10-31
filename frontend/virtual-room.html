@@ -54,7 +54,7 @@ console.log(greet('learner'));
 
       <section class="panel notes-panel" id="notesPanel" data-tab="notes">
         <div class="panel-heading"><div><h2>Meeting notes</h2><p id="notesStatus">Saved automatically &middot; shared with everyone in this room</p></div>
-          <div class="notes-tools"><button class="btn soft small share-btn" id="notesShareBtn" type="button">Share screen</button><button class="btn soft small" id="notesDownloadBtn" type="button">Download</button><button class="btn primary small" id="notesFullBtn" type="button">Full screen</button></div></div>
+          <div class="notes-tools"><button class="btn soft small share-btn" id="notesShareBtn" type="button">Share screen</button><button class="btn soft small" id="notesDownloadBtn" type="button">Download</button><button class="btn soft small" id="summaryBtn" type="button">Summary (notes + board)</button><button class="btn primary small" id="notesFullBtn" type="button">Full screen</button></div></div>
         <label class="sr-only" for="notesText">Meeting notes</label>
         <textarea id="notesText" maxlength="30000" spellcheck="true" placeholder="Key points, steps, links, homework… Everything you type here is saved."></textarea>
       </section>
@@ -62,10 +62,11 @@ console.log(greet('learner'));
 
     <aside class="side-column">
       <section class="panel board-panel" data-tab="board">
-        <div class="panel-heading"><div><h2>Shared whiteboard</h2><p>Sketch a solution together.</p></div><button class="btn soft small" id="clearBoardBtn">Clear</button></div>
-        <div class="board-tools"><label>Ink <input type="color" id="inkColor" value="#2563eb" aria-label="Ink color"></label><label>Width <input type="range" id="inkWidth" min="1" max="12" value="3" aria-label="Pen width"></label></div>
+        <div class="panel-heading"><div><h2>Shared whiteboard</h2><p>Fixed 16:9 pages. Every page is saved into the class summary.</p></div><div class="board-head-actions"><button class="btn soft small" id="boardBigBtn" type="button">Big board</button><button class="btn soft small" id="boardSummaryBtn" type="button">Summary</button><button class="btn soft small" id="clearBoardBtn">Clear page</button></div></div>
+        <div class="board-tools"><label>Ink <input type="color" id="inkColor" value="#2563eb" aria-label="Ink color"></label><label>Width <input type="range" id="inkWidth" min="1" max="12" value="3" aria-label="Pen width"></label><button class="btn soft small" id="eraserBtn" type="button" aria-pressed="false">Eraser</button>
+          <span class="page-nav"><button class="btn soft small" id="prevPageBtn" type="button" aria-label="Previous page">‹ Prev</button><b id="pageLabel">Page 1 / 1</b><button class="btn primary small" id="nextPageBtn" type="button">Next page +</button></span></div>
         <div class="canvas-wrap"><canvas id="whiteboard" aria-label="Collaborative whiteboard"></canvas></div>
-        <p class="board-note">Draw with your mouse, trackpad or touch screen.</p>
+        <p class="board-note">Draw with your mouse, trackpad or touch screen. Press “Next page” to keep this page and start a new one.</p>
       </section>
 
       <section class="panel chat-panel" data-tab="chat">

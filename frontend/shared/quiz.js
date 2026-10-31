@@ -1,8 +1,8 @@
 /* UpToSkill quiz + AI report module. Loaded by BOTH the student app and the tutor app.
-   Student: after a lesson, take a short quiz written by Grok (on the server). Score -> credits. Low score -> the AI explains
+   Student: after a lesson, take a short quiz written by Gemini (on the server). Score -> credits. Low score -> the AI explains
             the weak topics, and the tutor gets a report and can send a short video.
    Tutor:   "Student Reports" page: the AI report about each student, plus record/upload a short explainer video.
-   The Grok key lives on the server only. This file just talks to /quiz/... on the backend. */
+   The Gemini key lives on the server only. This file just talks to /quiz/... on the backend. */
 (function () {
   "use strict";
   const API = () => (window.UTSAuth && UTSAuth.apiBase) || "";

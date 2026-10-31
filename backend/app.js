@@ -11,6 +11,7 @@ import { query } from './db/pool.js';
 import { corsOrigin } from './lib/cors.js';
 import virtualRoomRoutes from './routes/virtual-room.js';
 import quizRoutes from './routes/quiz.js';
+import eventRoutes from './routes/events.js';
 import { errorHandler } from './middleware/error.js';
 
 export const app = express();
@@ -31,5 +32,6 @@ app.use('/slots', slotRoutes);
 app.use('/state', stateRoutes);
 app.use('/virtual-room', virtualRoomRoutes);
 app.use('/quiz', quizRoutes);
+app.use('/events', eventRoutes);
 
 app.use(errorHandler);

@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS tutor_videos (
 );
 
 -- ---------------------------------------------------------------------------------------------
--- Quizzes after a lesson (questions written by Grok, graded here), AI reports for tutors, tutors' short videos.
+-- Quizzes after a lesson (questions written by Gemini, graded here), AI reports for tutors, tutors' short videos.
 -- ---------------------------------------------------------------------------------------------
 
 -- Databases made before quizzes existed: let the credit ledger accept the new "quiz_reward" reason.
@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   total           INT,
   credits_awarded INT NOT NULL DEFAULT 0,
   review          JSONB,
-  analysis        JSONB,                               -- Grok's explanation for the student (only when the score was low)
+  analysis        JSONB,                               -- the AI's explanation for the student (only when the score was low)
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   graded_at       TIMESTAMPTZ,
   UNIQUE (student_id, session_ref)
@@ -250,3 +250,66 @@ CREATE TABLE IF NOT EXISTS remedial_videos (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_videos_student ON remedial_videos (student_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------------------------
+-- Weekly events (AI quiz + AI coding battle), daily AI reminders, push subscriptions, classroom summaries.
+-- ---------------------------------------------------------------------------------------------
+
+-- One quiz and one coding battle per week (Monday 00:00 -> next Monday 00:00, India time). Written by Gemini.
+CREATE TABLE IF NOT EXISTS events (
+  id          SERIAL PRIMARY KEY,
+  kind        TEXT NOT NULL CHECK (kind IN ('quiz','code')),
+  week_start  DATE NOT NULL,
+  title       TEXT NOT NULL,
+  topic       TEXT NOT NULL,
+  blurb       TEXT NOT NULL DEFAULT '',
+  content     JSONB NOT NULL,                 -- quiz: questions WITH answers (never sent before submit). code: problems + judging notes
+  starts_at   TIMESTAMPTZ NOT NULL,
+  ends_at     TIMESTAMPTZ NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (kind, week_start)
+);
+CREATE INDEX IF NOT EXISTS idx_events_time ON events (ends_at DESC);
+
+CREATE TABLE IF NOT EXISTS event_entries (
+  id            SERIAL PRIMARY KEY,
+  event_id      INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id       INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  answers       JSONB NOT NULL,
+  score         INT NOT NULL DEFAULT 0,
+  max_score     INT NOT NULL DEFAULT 0,
+  feedback      JSONB,
+  submitted_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (event_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entries_rank ON event_entries (event_id, score DESC, submitted_at ASC);
+
+-- Browser push subscriptions: this is how a reminder reaches a student who is NOT on the website.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         SERIAL PRIMARY KEY,
+  user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_id);
+
+-- One daily reminder per student per day (so a restart never sends it twice).
+CREATE TABLE IF NOT EXISTS reminder_log (
+  user_id INT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day     DATE NOT NULL,
+  source  TEXT NOT NULL DEFAULT 'ai',          -- 'ai' = written by Gemini, 'fallback' = built-in jokes (AI unavailable)
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, day)
+);
+
+-- Virtual classroom summary: shared notes, final code and every whiteboard PAGE, kept after the room closes.
+CREATE TABLE IF NOT EXISTS room_summaries (
+  room       TEXT PRIMARY KEY,
+  notes      TEXT NOT NULL DEFAULT '',
+  code       TEXT NOT NULL DEFAULT '',
+  lang       TEXT NOT NULL DEFAULT 'javascript',
+  pages      JSONB NOT NULL DEFAULT '[[]]',    -- whiteboard: array of pages, each page = array of strokes (points are 0..1 of the page)
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

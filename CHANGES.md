@@ -113,7 +113,7 @@ The update was built on an older snapshot (no mentors/slots routes, no `back.js`
 
 ## Round 9 (merge of the AI quiz update into Round 8)
 The quiz update was built on the Round 6 snapshot (before the classroom editor/notes, reviews, student-as-mentor and mobile dashboards), so it was merged by hand into the latest version instead of copied over. Nothing from Round 7 or 8 was removed.
-- Added from the quiz update: `backend/services/grok.js`, `backend/services/quiz.js`, `backend/routes/quiz.js`, `frontend/shared/quiz.js`, `QUIZ_SETUP.md`, `backend/.env.example` (placeholders only). `app.js` mounts `/quiz`; `schema.sql` gets the `quiz_reward` ledger reason and the tables `quizzes`, `student_reports`, `remedial_videos` (safe to re-run with `npm run db:migrate`).
+- Added from the quiz update: `backend/services/ai.js (was grok.js; now Gemini)`, `backend/services/quiz.js`, `backend/routes/quiz.js`, `frontend/shared/quiz.js`, `QUIZ_SETUP.md`, `backend/.env.example` (placeholders only). `app.js` mounts `/quiz`; `schema.sql` gets the `quiz_reward` ledger reason and the tables `quizzes`, `student_reports`, `remedial_videos` (safe to re-run with `npm run db:migrate`).
 - Student app: **Quizzes** page, "Take quiz" on finished lessons, quiz offer when the student leaves a lesson. Tutor app: **Student Reports** page with unread badge.
 - Clash fixes:
   - **Review window vs quiz**: leaving the classroom now opens the review window and, once it is sent or skipped, the optional quiz offer (the two dialogs never show at the same time). The quiz code used to wipe the `?review=...` URL parameters before the review window could read them; both now use one copy of the parameters read at page load.
@@ -122,3 +122,6 @@ The quiz update was built on the Round 6 snapshot (before the classroom editor/n
   - Student menu: Quizzes sits next to Instant Help; it does not move Messages / Session Requests.
   - Kept from Round 7 and 8: editor / notes / screen share, reviews for both sides, student-as-mentor, tutor messages to learners, `mobile.css`, viewport-fit for phones.
   - Quiz stores one quiz per lesson using the lesson `ref` (falls back to the lesson id if a lesson has none).
+
+## Round: Gemini + weekly events + daily reminders + whiteboard pages
+See `NEW_FEATURES.md`.

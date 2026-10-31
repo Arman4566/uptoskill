@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UpToSkill · Class summary</title>
+<link rel="icon" href="assets/favicon.png">
+<script src="virtual-room-config.js"></script>
+<style>
+  :root{font-family:Inter,system-ui,Segoe UI,sans-serif;color:#0f1b3d;background:#f3f6fc}
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 16px 60px}
+  main{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+  h1{margin:0;font-size:24px}h2{margin:0 0 10px;font-size:17px}
+  .muted{color:#55627f;font-size:13px}
+  .card{background:#fff;border:1px solid #dde6f7;border-radius:14px;padding:18px}
+  pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 ui-monospace,Consolas,monospace}
+  .notes{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.7}
+  .page{margin-top:14px}
+  .page canvas{width:100%;aspect-ratio:16/9;display:block;border:1px solid #cbd5e1;border-radius:8px;background:#fff}
+  .page small{display:block;margin-bottom:6px;color:#55627f;font-weight:600}
+  button{font:600 13px inherit;padding:10px 16px;border-radius:10px;border:0;background:#1d4ed8;color:#fff;cursor:pointer}
+  .err{color:#b42318;font-weight:600}
+  @media print{
+    body{background:#fff;padding:0}.card{border:0;padding:0;break-inside:auto}button,.noprint{display:none}
+    .page{break-inside:avoid;page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Class summary</h1><div class="muted" id="meta">Loading…</div></div>
+    <button id="printBtn" class="noprint" type="button">Print / Save as PDF</button>
+  </header>
+  <p class="err" id="err" hidden></p>
+  <section class="card" id="notesCard" hidden><h2>Meeting notes</h2><div class="notes" id="notes"></div></section>
+  <section class="card" id="boardCard" hidden><h2>Whiteboard</h2><div id="pages"></div></section>
+  <section class="card" id="codeCard" hidden><h2>Final code <span class="muted" id="lang"></span></h2><pre id="code"></pre></section>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var room = params.get('room') || '';
+  var base = String(window.UPTOSKILL_API_URL || params.get('api') || location.origin).replace(/\/$/, '');
+  var LANG = { javascript: 'JavaScript', python: 'Python', 'text/x-java': 'Java', 'text/x-csrc': 'C', 'text/x-c++src': 'C++', htmlmixed: 'HTML', css: 'CSS' };
+  function fail(msg) { $('err').hidden = false; $('err').textContent = msg; $('meta').textContent = ''; }
+  function drawPage(canvas, strokes) {
+    var W = 1280, H = 720; canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    (strokes || []).forEach(function (s) {
+      if (!s || !s.points || !s.points.length) return;
+      ctx.strokeStyle = s.color || '#2563eb'; ctx.lineWidth = (s.width || 3) * (W / 640);
+      ctx.beginPath(); ctx.moveTo(s.points[0].x * W, s.points[0].y * H);
+      for (var i = 1; i < s.points.length; i++) ctx.lineTo(s.points[i].x * W, s.points[i].y * H);
+      if (s.points.length === 1) ctx.lineTo(s.points[0].x * W + 0.01, s.points[0].y * H + 0.01);
+      ctx.stroke();
+    });
+  }
+  $('printBtn').onclick = function () { window.print(); };
+  if (!/^uts-[A-Za-z0-9_-]{8,100}$/.test(room)) return fail('This summary link is not valid.');
+  fetch(base + '/virtual-room/summary/' + encodeURIComponent(room)).then(function (r) {
+    return r.json().then(function (d) { if (!r.ok) throw new Error(d.message || 'Could not load the summary.'); return d; });
+  }).then(function (d) {
+    $('meta').textContent = 'Room ' + room + ' · saved ' + new Date(d.updated_at).toLocaleString();
+    if ((d.notes || '').trim()) { $('notes').textContent = d.notes; $('notesCard').hidden = false; }
+    var pages = (d.pages || []).filter(function (p, i, all) { return (p && p.length) || all.length === 1; });
+    var drawn = (d.pages || []).some(function (p) { return p && p.length; });
+    if (drawn) {
+      (d.pages || []).forEach(function (p, i) {
+        if (!p || !p.length) return;                                   // blank pages are left out of the summary
+        var wrap = document.createElement('div'); wrap.className = 'page';
+        wrap.innerHTML = '<small>Page ' + (i + 1) + ' of ' + d.pages.length + '</small>';
+        var c = document.createElement('canvas'); wrap.appendChild(c); $('pages').appendChild(wrap); drawPage(c, p);
+      });
+      $('boardCard').hidden = false;
+    }
+    var code = (d.code || '').trim();
+    if (code && code !== '// Welcome to the shared editor') { $('code').textContent = d.code; $('lang').textContent = '(' + (LANG[d.lang] || d.lang) + ')'; $('codeCard').hidden = false; }
+    if ($('notesCard').hidden && $('boardCard').hidden && $('codeCard').hidden) $('meta').textContent += ' · nothing was written or drawn yet';
+  }).catch(function (e) { fail(e.message === 'Failed to fetch' ? 'Cannot reach the server. Is it running?' : e.message); });
+})();
+</script>
+</body>
+</html>

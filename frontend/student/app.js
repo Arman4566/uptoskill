@@ -130,7 +130,7 @@ function streakHTML() {
 }
 function menu() {
   const m = [["dashboard", "Dashboard", "grid"], ["find", "Find Mentors", "search"], ["sessions", "My Sessions", "cal"], ["instant", "Instant Help", "bolt"],
-    ["quizzes", "Quizzes" + (quizNew ? ` (${quizNew})` : ""), "quiz"], ["board", "Doubt Board", "help"], ["ledger", "Credits & Ledger", "wallet"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
+    ["quizzes", "Quizzes" + (quizNew ? ` (${quizNew})` : ""), "quiz"], ["events", "Weekly Events", "trophy"], ["board", "Doubt Board", "help"], ["ledger", "Credits & Ledger", "wallet"], ["leaderboard", "Leaderboard", "trophy"], ["profile", "Profile", "user"]];
   const unread = window.UTSShared && window.UTS ? UTSShared.studentThreads(UTS.email).reduce((n, c) => n + c.unread, 0) : 0;
   m.splice(2, 0, ["messages", "Messages" + (unread ? ` (${unread})` : ""), "chat"]);
   if (S.user.mentor) m.splice(4, 0, ["requests", `Session Requests (${S.incoming.length})`, "inbox"]);
@@ -147,6 +147,7 @@ function go(id) {
   page = id; if (window.UTSBack) UTSBack.note(id); renderNav();
   $("#main").innerHTML = PAGES[id]();
   if (id === "quizzes" && window.UTSQuiz) UTSQuiz.studentPage($("#quizpage")).then(() => { quizNew = 0; renderNav(); });
+  if (id === "events" && window.UTSEvents) UTSEvents.page($("#eventspage"));
   if (id === "dashboard" || id === "find") updateTutors();
   window.scrollTo(0, 0);
 }
@@ -207,6 +208,7 @@ const PAGES = {
       `<div class="tabs">${["upcoming", "past"].map(t => `<button class="btn ${tab === t ? "" : "ghost"}" data-act="tab" data-id="${t}">${t === "upcoming" ? "Upcoming" : "Past"}</button>`).join("")}</div>` +
       (list.length ? list.slice().reverse().map(sessionHTML).join("") : `<div class="empty"><b>Nothing here yet</b>Book a mentor from Find Mentors or use Instant Help.</div>`);
   },
+  events() { return head("Weekly Events", "A new AI quiz and coding battle every week. Play, climb the leaderboard, get notified.") + `<div id="eventspage"></div>`; },
   quizzes() { return head("Quizzes", "Take a short AI quiz after each lesson, earn credits, and get help on weak topics.") + `<div id="quizpage"></div>`; },
   instant() {
     return head("Instant Help", "Get matched with a mentor right now. 15 minutes costs 2 credits.") +
@@ -636,6 +638,6 @@ function startQuizFeatures() {
   pollVideos(); setInterval(pollVideos, 60000);
 }
 
-go("dashboard");
+go(location.hash === "#events" ? "events" : "dashboard");
 publishMentor(); checkMentorNotifs(); openReviewFromUrl(); startQuizFeatures();
 checkNotifs();

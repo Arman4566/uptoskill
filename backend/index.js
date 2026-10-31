@@ -5,6 +5,8 @@ import { corsOrigin } from './lib/cors.js';
 import { app } from './app.js';
 import { expireStale } from './services/sessions.js';
 import { query } from './db/pool.js';
+import { ensureWeekly } from './services/events.js';
+import { runDailyReminders } from './services/reminders.js';
 
 // Fail fast with a readable message instead of a 500 on the first login.
 for (const k of ['DATABASE_URL', 'JWT_SECRET']) {
@@ -35,3 +37,13 @@ query('SELECT COUNT(*)::int AS n FROM users').then(
 setInterval(() => {
   expireStale().catch((err) => console.error('expireStale failed', err));
 }, 60_000);
+
+// Weekly AI events + daily AI reminders. Both are safe to repeat (they check the database first), so a restart never doubles them.
+// NOTE: on a free host that sleeps (Render free), nothing runs while it sleeps. Ping /health every 10 minutes
+// (UptimeRobot / cron-job.org) to keep it awake, or run `npm run events:now` from a scheduler.
+const tickJobs = () => {
+  ensureWeekly().catch((err) => console.error('ensureWeekly failed', err));
+  runDailyReminders().catch((err) => console.error('runDailyReminders failed', err));
+};
+setTimeout(tickJobs, 20_000).unref();
+setInterval(tickJobs, 10 * 60_000).unref();

@@ -73,3 +73,18 @@ body.notes-full{overflow:hidden}
   .notes-panel.fullscreen .notes-tools{flex-wrap:nowrap;overflow-x:auto}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===== Whiteboard: fixed 16:9 pages, page controls, big board ===== */
+.canvas-wrap{height:auto!important;aspect-ratio:16/9;background:#fff;max-width:100%}
+.board-head-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.board-tools{flex-wrap:wrap;gap:10px 16px}
+.page-nav{margin-left:auto;display:flex;align-items:center;gap:8px;color:#d9e5f7}
+.page-nav b{font-size:12px;min-width:84px;text-align:center}
+.btn[disabled]{opacity:.45;cursor:default;filter:none}
+#eraserBtn.on{background:#2563eb;border-color:#3b82f6;color:#fff}
+.board-panel.big{position:fixed;inset:0;z-index:55;border-radius:0;border:0;display:flex!important;flex-direction:column;background:#0b1020;padding-top:env(safe-area-inset-top);overflow:auto}
+.board-panel.big .canvas-wrap{margin:0 auto;width:min(calc(100vw - 24px),calc((100dvh - 210px) * 16 / 9));max-width:none}
+.board-panel.big .board-note{text-align:center}
+body.board-big{overflow:hidden}
+body.board-big .control-dock,body.board-big .media-hint{display:none}
+@media(max-width:640px){.page-nav{margin-left:0;width:100%;justify-content:space-between}.board-panel.big .canvas-wrap{width:calc(100vw - 16px)}}

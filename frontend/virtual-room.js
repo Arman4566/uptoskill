@@ -170,20 +170,24 @@ document.querySelectorAll('#mobileNav button').forEach((b) => b.addEventListener
 $('notesJumpBtn').addEventListener('click', () => { if (matchMedia('(max-width:980px)').matches) showTab('notes'); else { $('notesPanel').scrollIntoView({ behavior: 'smooth', block: 'center' }); notesEl.focus(); } });
 document.body.dataset.tab = 'video';
 
-// ---- Shared whiteboard ----
+// ---- Shared whiteboard: fixed 16:9 pages. "Next page" saves the page you are on and opens a fresh one. ----
 const canvas = $('whiteboard');
 const ctx = canvas.getContext('2d');
+const PAGE_BG = '#ffffff';
+const MAX_PAGES = 30, MAX_STROKES = 800;
+let pages = [[]];            // every page: an array of strokes (points are 0..1 of the page, so any size shows the same drawing)
+let pageIdx = 0;
 let drawing = false;
 let currentPoints = [];
+let eraser = false;
+const boardStrokes = () => pages[pageIdx];
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const old = canvas.width && canvas.height ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
   canvas.width = Math.max(1, Math.floor(rect.width * dpr));
   canvas.height = Math.max(1, Math.floor(rect.height * dpr));
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, rect.width, rect.height);
-  if (old) redrawStrokes();
+  redrawStrokes();
 }
 function normalizedPoint(event) {
   const rect = canvas.getBoundingClientRect();
@@ -191,34 +195,33 @@ function normalizedPoint(event) {
 }
 function drawStroke(stroke) {
   if (!stroke?.points?.length) return;
-  const w = canvas.getBoundingClientRect().width, h = canvas.getBoundingClientRect().height;
-  ctx.strokeStyle = stroke.color || '#2563eb'; ctx.lineWidth = stroke.width || 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const rect = canvas.getBoundingClientRect(), w = rect.width, h = rect.height;
+  ctx.strokeStyle = stroke.color || '#2563eb'; ctx.lineWidth = (stroke.width || 3) * (w / 640); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(stroke.points[0].x * w, stroke.points[0].y * h);
   for (let i = 1; i < stroke.points.length; i++) ctx.lineTo(stroke.points[i].x * w, stroke.points[i].y * h);
   if (stroke.points.length === 1) { ctx.lineTo(stroke.points[0].x * w + 0.01, stroke.points[0].y * h + 0.01); }
   ctx.stroke();
 }
-let boardStrokes = [];
 function redrawStrokes() {
   const rect = canvas.getBoundingClientRect();
-  ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, rect.width, rect.height);
-  boardStrokes.forEach(drawStroke);
+  ctx.fillStyle = PAGE_BG; ctx.fillRect(0, 0, rect.width, rect.height);
+  boardStrokes().forEach(drawStroke);
 }
+const penStroke = (points) => ({ color: eraser ? PAGE_BG : $('inkColor').value, width: eraser ? Number($('inkWidth').value) * 4 : Number($('inkWidth').value), points });
 function pointerDown(event) {
   drawing = true; currentPoints = [normalizedPoint(event)]; canvas.setPointerCapture?.(event.pointerId); event.preventDefault();
 }
 function pointerMove(event) {
   if (!drawing) return;
   const point = normalizedPoint(event); currentPoints.push(point);
-  const stroke = { color: $('inkColor').value, width: Number($('inkWidth').value), points: currentPoints.slice(-2) };
-  drawStroke(stroke); event.preventDefault();
+  drawStroke(penStroke(currentPoints.slice(-2))); event.preventDefault();
 }
 function pointerUp() {
   if (!drawing) return; drawing = false;
   if (currentPoints.length) {
-    const stroke = { color: $('inkColor').value, width: Number($('inkWidth').value), points: currentPoints.slice(0, 1500) };
-    boardStrokes.push(stroke); if (boardStrokes.length > 1500) boardStrokes.shift();
-    socket?.emit('whiteboard:stroke', { stroke });
+    const stroke = penStroke(currentPoints.slice(0, 400));
+    const list = boardStrokes(); list.push(stroke); if (list.length > MAX_STROKES) list.shift();
+    socket?.emit('whiteboard:stroke', { stroke, page: pageIdx });
   }
   currentPoints = [];
 }
@@ -227,10 +230,66 @@ canvas.addEventListener('pointermove', pointerMove);
 canvas.addEventListener('pointerup', pointerUp);
 canvas.addEventListener('pointercancel', pointerUp);
 $('clearBoardBtn').addEventListener('click', () => {
-  if (!confirm('Clear the shared whiteboard for everyone in this room?')) return;
-  boardStrokes = []; redrawStrokes(); socket?.emit('whiteboard:clear');
+  if (!confirm('Clear this page of the shared whiteboard for everyone in this room?')) return;
+  pages[pageIdx] = []; redrawStrokes(); socket?.emit('whiteboard:clear', { page: pageIdx });
 });
+$('eraserBtn').addEventListener('click', () => {
+  eraser = !eraser; $('eraserBtn').classList.toggle('on', eraser); $('eraserBtn').setAttribute('aria-pressed', String(eraser));
+});
+
+// Pages
+function updatePageUI() {
+  $('pageLabel').textContent = `Page ${pageIdx + 1} / ${pages.length}`;
+  $('prevPageBtn').disabled = pageIdx === 0;
+  $('nextPageBtn').textContent = pageIdx === pages.length - 1 ? 'Next page +' : 'Next page ›';
+}
+function setPages(list, idx) {
+  pages = Array.isArray(list) && list.length ? list.map((p) => (Array.isArray(p) ? p : [])) : [[]];
+  pageIdx = Math.max(0, Math.min(pages.length - 1, Number.isInteger(idx) ? idx : pages.length - 1));
+  updatePageUI(); redrawStrokes();
+}
+function showPage(count, idx) {                                 // another person (or I) changed the page
+  while (pages.length < count) pages.push([]);
+  pageIdx = Math.max(0, Math.min(pages.length - 1, idx)); updatePageUI(); redrawStrokes();
+}
+$('prevPageBtn').addEventListener('click', () => { if (pageIdx > 0) { showPage(pages.length, pageIdx - 1); socket?.emit('whiteboard:page', { action: 'goto', index: pageIdx }); } });
+$('nextPageBtn').addEventListener('click', () => {
+  if (pageIdx < pages.length - 1) { showPage(pages.length, pageIdx + 1); socket?.emit('whiteboard:page', { action: 'goto', index: pageIdx }); return; }
+  if (pages.length >= MAX_PAGES) return toast(`A room can hold at most ${MAX_PAGES} pages.`);
+  showPage(pages.length + 1, pages.length); toast(`Page ${pages.length - 1} saved. This is page ${pages.length}.`);
+  socket?.emit('whiteboard:page', { action: 'new' });
+});
+
+// Big whiteboard: fills the screen (the page keeps its 16:9 shape, so nothing is stretched)
+let boardBig = false;
+function setBoardBig(on) {
+  boardBig = on;
+  document.querySelector('.board-panel').classList.toggle('big', on); document.body.classList.toggle('board-big', on);
+  $('boardBigBtn').textContent = on ? 'Exit big board' : 'Big board';
+  if (on) { try { document.documentElement.requestFullscreen?.().catch(() => { }); } catch { } }
+  else if (document.fullscreenElement) { try { document.exitFullscreen?.(); } catch { } }
+  requestAnimationFrame(() => { resizeCanvas(); });
+}
+$('boardBigBtn').addEventListener('click', () => setBoardBig(!boardBig));
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && boardBig) setBoardBig(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && boardBig) setBoardBig(false); });
 window.addEventListener('resize', resizeCanvas);
+
+// Summary: notes + code + every whiteboard page, ready to print or save as PDF
+function openSummary(btn) {
+  const w = window.open('about:blank', '_blank');
+  const go = () => {
+    const url = `virtual-room-summary.html?room=${encodeURIComponent(roomCode)}`;
+    if (w) w.location.href = url; else location.href = url;
+  };
+  if (!socket?.connected) return go();
+  let done = false; const once = () => { if (!done) { done = true; go(); } };
+  setTimeout(once, 2500);
+  socket.emit('room:save', {}, once);
+}
+$('summaryBtn').addEventListener('click', openSummary);
+$('boardSummaryBtn').addEventListener('click', openSummary);
+setPages([[]], 0);
 resizeCanvas();
 
 // ---- Room chat and participant list ----
@@ -286,7 +345,7 @@ function connectCollaboration() {
       if (state.notes || !notesEl.value) applyRemoteNotes(state.notes);
       else pushNotes(); // the server room is new but this browser still has the saved notes: restore them
     }
-    boardStrokes = Array.isArray(state.strokes) ? state.strokes : []; redrawStrokes();
+    setPages(state.board?.pages, state.board?.page);
     $('chatMessages').replaceChildren(); (state.chat || []).forEach(appendMessage);
     renderMembers(state.members || []); setSyncStatus('Live sync connected');
     if (codeDirty) sendCode(); // edits made while offline are pushed after rejoining
@@ -299,8 +358,15 @@ function connectCollaboration() {
   });
   socket.on('code:lang', ({ lang }) => setLanguage(lang));
   socket.on('notes:change', ({ text }) => { if (typeof text === 'string') applyRemoteNotes(text); });
-  socket.on('whiteboard:stroke', stroke => { boardStrokes.push(stroke); if (boardStrokes.length > 1500) boardStrokes.shift(); drawStroke(stroke); });
-  socket.on('whiteboard:clear', () => { boardStrokes = []; redrawStrokes(); });
+  socket.on('whiteboard:stroke', ({ stroke, page }) => {
+    if (!stroke || !Number.isInteger(page)) return;
+    while (pages.length <= page) pages.push([]);
+    pages[page].push(stroke); if (pages[page].length > MAX_STROKES) pages[page].shift();
+    if (page === pageIdx) drawStroke(stroke);
+    updatePageUI();
+  });
+  socket.on('whiteboard:clear', ({ page } = {}) => { if (!Number.isInteger(page)) return; while (pages.length <= page) pages.push([]); pages[page] = []; if (page === pageIdx) redrawStrokes(); });
+  socket.on('whiteboard:page', ({ page, count }) => { if (Number.isInteger(page) && Number.isInteger(count)) showPage(count, page); });
   socket.on('chat:message', appendMessage);
 }
 

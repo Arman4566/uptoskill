@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AccessToken } from 'livekit-server-sdk';
+import { query } from '../db/pool.js';
 
 const router = Router();
 const ROOM_RE = /^uts-[A-Za-z0-9_-]{8,100}$/;
@@ -40,6 +41,20 @@ router.post('/token', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// The classroom summary: shared notes, final code and every whiteboard page. Like the room link itself, the room code is the key:
+// whoever was invited to the room can open its summary (frontend/virtual-room-summary.html) and print it / save it as PDF.
+router.get('/summary/:room', async (req, res, next) => {
+  try {
+    if (limited(req.ip)) return res.status(429).json({ error: 'RATE_LIMITED', message: 'Too many requests. Wait a minute and try again.' });
+    const room = String(req.params.room || '');
+    if (!ROOM_RE.test(room)) return res.status(400).json({ error: 'INVALID_ROOM', message: 'Room code is invalid.' });
+    const { rows } = await query('SELECT notes, code, lang, pages, updated_at FROM room_summaries WHERE room = $1', [room]);
+    if (!rows.length) return res.status(404).json({ error: 'NO_SUMMARY', message: 'Nothing has been saved for this room yet.' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ room, ...rows[0] });
+  } catch (err) { next(err); }
 });
 
 export default router;

@@ -35,5 +35,5 @@ Added from the Virtual Classroom update. Needs a free LiveKit Cloud project: put
 - **Tutors and bookings are real.** The student's tutor list is built from the tutors' public profiles. A booking is sent to that tutor, who accepts or declines in the tutor app; the student sees the answer, chats with the tutor, and rates the tutor after the session.
 - Real bookings, credits escrow and availability on the server's own tables are also used from **Live Lessons** (`lessons.html`).
 
-## AI quizzes (Grok)
-After a lesson the student can take an AI-written quiz, earn credits, and get weak-topic explanations; the tutor gets an AI report and can send a short video. Needs `XAI_API_KEY` in `backend/.env`. Steps: `QUIZ_SETUP.md`.
+## AI quizzes (Gemini)
+After a lesson the student can take an AI-written quiz, earn credits, and get weak-topic explanations; the tutor gets an AI report and can send a short video. Needs `GEMINI_API_KEY` in `backend/.env`. Steps: `QUIZ_SETUP.md`.

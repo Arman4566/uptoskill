@@ -16,7 +16,7 @@ import { AppError } from '../lib/errors.js';
 import { ah } from '../lib/async.js';
 import { requireAuth } from '../middleware/auth.js';
 import * as ledger from '../services/ledger.js';
-import { grokReady } from '../services/grok.js';
+import { aiReady } from '../services/ai.js';
 import { quizConfig, clean, generateQuestions, publicQuestions, grade, analyse } from '../services/quiz.js';
 
 const router = Router();
@@ -53,7 +53,7 @@ const studentQuiz = async (id, userId) => {
 };
 
 router.get('/config', ah(async (req, res) => {
-  res.json({ aiReady: grokReady(), questions: quizConfig.questions, passPct: quizConfig.passPct, perfectPct: quizConfig.perfectPct,
+  res.json({ aiReady: aiReady(), questions: quizConfig.questions, passPct: quizConfig.passPct, perfectPct: quizConfig.perfectPct,
     rewardPass: quizConfig.rewardPass, rewardPerfect: quizConfig.rewardPerfect });
 }));
 
@@ -72,7 +72,7 @@ router.post('/start', ah(async (req, res) => {
 
   const topic = clean(body.topic), title = clean(body.title, 200);
   const { rows: me } = await query('SELECT level FROM users WHERE id = $1', [req.userId]);
-  const questions = await generateQuestions({ topic, title, level: me[0]?.level });          // Grok call (throws a readable error if not set up)
+  const questions = await generateQuestions({ topic, title, level: me[0]?.level });          // AI call (throws a readable error if not set up)
   let tutorId = null;
   if (body.tutorEmail) {
     const t = await query('SELECT id FROM users WHERE email = $1 AND id <> $2', [body.tutorEmail, req.userId]);
