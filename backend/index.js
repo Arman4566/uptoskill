@@ -26,20 +26,9 @@ server.on('error', (err) => {
 });
 server.listen(PORT, () => console.log(`API on :${PORT}  (try http://localhost:${PORT}/health)`));
 // Tell the developer right away if the database cannot be reached or was never migrated.
-// (A refused connection arrives as an AggregateError with an empty message, so dig out the real reason.)
-function dbReason(err) {
-  const e = err?.errors?.[0] || err;
-  const where = (() => { try { const u = new URL(process.env.DATABASE_URL); return `${u.hostname}:${u.port || 5432}`; } catch { return 'DATABASE_URL (not a valid URL)'; } })();
-  if (e?.code === '42P01') return 'tables are missing. Run "npm run db:migrate" and then "npm run db:seed".';
-  if (e?.code === 'ECONNREFUSED') return `nothing is listening on ${where}. Start PostgreSQL, or put your hosted database URL in DATABASE_URL.`;
-  if (e?.code === 'ENOTFOUND') return `host not found (${where}). Check DATABASE_URL and your internet connection.`;
-  if (e?.code === '28P01') return 'wrong database username or password in DATABASE_URL.';
-  if (e?.code === '3D000') return 'that database does not exist. Create it, or fix the name in DATABASE_URL.';
-  return `${e?.code || ''} ${e?.message || err} (target ${where})`.trim();
-}
 query('SELECT COUNT(*)::int AS n FROM users').then(
-  ({ rows }) => console.log(`Database OK (${rows[0].n} users). Run "npm run db:seed" for the demo accounts.`),
-  (err) => console.error(`Database problem: ${dbReason(err)}`)
+  ({ rows }) => console.log(`Database OK (${rows[0].n} users). Sign up on the website to create accounts.`),
+  (err) => console.error(`Database problem: ${err.message}. Check DATABASE_URL, then run "npm run db:migrate".`)
 );
 
 // Expire stale requests / release stuck escrow every minute.

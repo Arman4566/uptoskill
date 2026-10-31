@@ -4,7 +4,8 @@
    - Notifications tutor -> student                                      -> localStorage "uts_notifs"
    - Notifications student -> tutor (e.g. lecture delayed)               -> localStorage "uts_tnotifs"
    - Student <-> tutor chat threads                                      -> localStorage "uts_chats"
-   When the backend is connected, replace the bodies of these functions with fetch() calls; the callers stay the same. */
+   These keys are saved to the database and loaded back by shared/sync.js, so the data is shared between accounts and devices.
+   (The intro video file itself is large and still lives only in this browser's IndexedDB.) */
 (function () {
   "use strict";
   const PK = "uts_tutor_profiles", NK = "uts_notifs", TNK = "uts_tnotifs", CK = "uts_chats";
@@ -19,6 +20,8 @@
     all[k] = { ...getProfile(email), ...patch, updated: Date.now() };
     return wr(PK, all);
   }
+
+  const profiles = () => rd(PK, {});                                    // every tutor's public profile (the student app builds its tutor list from this)
 
   /* ---------- image: any picture -> 320px square JPEG data URL (small enough for localStorage) ---------- */
   function squarePhoto(src, size) {
@@ -45,7 +48,7 @@
   }
 
   /* ---------- video rules: max 60 s, ratio 9:16 (portrait) or 16:9 (landscape) ---------- */
-  const VIDEO = { maxSec: 60, maxBytes: 150 * 1024 * 1024, tol: 0.03 };
+  const VIDEO = { maxSec: 60, maxBytes: 100 * 1024 * 1024, tol: 0.03 };
   function probeVideo(file) {
     return new Promise((res, rej) => {
       const v = document.createElement("video"), u = URL.createObjectURL(file);
@@ -62,7 +65,7 @@
   }
   async function checkVideo(file) {
     if (!file || !/^video\//.test(file.type)) throw new Error("Please choose a video file.");
-    if (file.size > VIDEO.maxBytes) throw new Error("Video file is too large (max 150 MB).");
+    if (file.size > VIDEO.maxBytes) throw new Error("Video file is too large (max 100 MB).");
     const m = await probeVideo(file);
     if (!isFinite(m.duration) || m.duration <= 0) throw new Error("Could not read the video length.");
     if (m.duration > VIDEO.maxSec + 0.4) throw new Error(`Video is ${Math.round(m.duration)} s long. The limit is 1 minute.`);
@@ -78,14 +81,28 @@
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
   const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction("video", mode), q = fn(t.objectStore("video")); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
+  /* The video is kept in this browser (IndexedDB) and uploaded to the database so students on other devices can play it. */
+  const API = () => (window.UTSAuth && UTSAuth.apiBase) || "";
+  const auth = () => { try { return { Authorization: "Bearer " + localStorage.getItem("uts_api_token") }; } catch (e) { return {}; } };
   async function saveVideo(email, file) {
     const meta = await checkVideo(file);
+    let res; try { res = await fetch(API() + "/state/video", { method: "PUT", headers: Object.assign({ "Content-Type": file.type }, auth()), body: file }); } catch (e) { res = null; }
+    if (!res || !res.ok) throw new Error("The video could not be uploaded to the server. Check your connection and try again.");
     await tx("readwrite", s => s.put(file, norm(email)));
     setProfile(email, { video: { ...meta, ts: Date.now() } });
     return meta;
   }
-  const getVideo = email => tx("readonly", s => s.get(norm(email))).catch(() => null);
-  async function removeVideo(email) { await tx("readwrite", s => s.delete(norm(email))); setProfile(email, { video: null }); }
+  async function getVideo(email) {
+    const local = await tx("readonly", s => s.get(norm(email))).catch(() => null);
+    if (local) return local;
+    try { const res = await fetch(API() + "/state/video/" + encodeURIComponent(norm(email)), { headers: auth() }); if (res.ok) return await res.blob(); } catch (e) { }
+    return null;
+  }
+  async function removeVideo(email) {
+    await tx("readwrite", s => s.delete(norm(email)));
+    try { await fetch(API() + "/state/video", { method: "DELETE", headers: auth() }); } catch (e) { }
+    setProfile(email, { video: null });
+  }
 
   /* ---------- notifications (tutor -> student) ---------- */
   function notify(toEmail, n) {
@@ -124,5 +141,5 @@
       .sort((a, b) => (b.msgs.at(-1)?.ts || 0) - (a.msgs.at(-1)?.ts || 0));
   }
 
-  window.UTSShared = { getProfile, setProfile, photoFromFile, squarePhoto, VIDEO, checkVideo, ratioOf, saveVideo, getVideo, removeVideo, notify, notifications, markRead, notifyTutor, tutorNotifications, markTutorRead, threadId, chatThread, chatSend, chatSeen, tutorThreads };
+  window.UTSShared = { profiles, getProfile, setProfile, photoFromFile, squarePhoto, VIDEO, checkVideo, ratioOf, saveVideo, getVideo, removeVideo, notify, notifications, markRead, notifyTutor, tutorNotifications, markTutorRead, threadId, chatThread, chatSend, chatSeen, tutorThreads };
 })();

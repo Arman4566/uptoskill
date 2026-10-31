@@ -39,10 +39,10 @@ function sweep() {
     else if (r.expiresTs <= now) { fallbackToBounty(r); say("Instant request moved to the Doubt Board (no taker in 60s)"); ch = true; }
   });
   // booking requests expire after 24h, nothing was held
-  S.sessions.filter(s => s.status === "requested" && now - s.reqTs > REQ_TTL).forEach(s => { s.status = "expired"; ch = true; });
+  S.sessions.filter(s => s.status === "requested" && now - s.reqTs > REQ_TTL).forEach(s => { s.status = "expired"; ch = true; tellStudent(s, "booking_declined", "Request expired", `${S.me.name} did not answer “${s.title}” within 24 hours. Your ${s.credits} credits were refunded.`); });
   // after completion: learner rates, AI writes notes
   S.sessions.filter(s => s.status === "completed" && s.rateAt && s.rateAt <= now).forEach(s => {
-    s.rateAt = 0; const r = rate(s); ch = true;
+    const pr = s.pendingRating; s.rateAt = 0; s.pendingRating = 0; const r = rate(s, pr ? { stars: pr } : undefined); ch = true;
     if (r) say(`${r.name} rated you ${r.stars}★${r.bonus ? " (+1 bonus credit)" : ""}`);
     const lv = refreshLevel(); if (lv) say(`Level up! You are now Level ${lv} ${levelName(lv)}`);
     checkBadges().forEach(k => say("Badge unlocked: " + BADGE_INFO[k][0]));

@@ -41,7 +41,7 @@
   function loginForm(note) {
     const ls = localSession();
     document.getElementById("app").innerHTML = `<section class="card pad" style="max-width:420px"><h1>Sign in</h1>
-      <p class="mut">${note || "Lessons use your UpToSkill server account."}${ls ? "" : ""} Demo: <b>student@demo.com</b> or <b>tutor@demo.com</b>, password <b>demo1234</b> (run <code>npm run db:seed</code> in /backend first).</p>
+      <p class="mut">${note || "Lessons use your UpToSkill server account."}</p>
       <form id="lf" style="display:flex;flex-direction:column;gap:12px"><label>Email<input id="le" type="email" required value="${esc(ls ? ls.email : "")}"></label>
       <label>Password<input id="lp" type="password" required></label><p class="err" id="lerr" hidden></p><div><button class="btn">Sign in</button></div></form>
       <p class="mut"><a href="${homeUrl()}">Back to my dashboard</a></p></section>`;

@@ -8,7 +8,8 @@
 
   // already signed in with this role -> go straight to the app
   const s0 = UTSAuth.session();
-  if (s0 && s0.role === role) location.replace(next);
+  let hasTok = false; try { hasTok = !!localStorage.getItem("uts_api_token"); } catch (e) { }
+if (s0 && s0.role === role && hasTok) location.replace(next);
 
   const showErr = (m, html) => { err.hidden = false; err.classList.add("on"); err[html ? "innerHTML" : "textContent"] = m; };
   const clearErr = () => { err.classList.remove("on"); err.textContent = ""; };
@@ -31,8 +32,6 @@
   document.addEventListener("uts-lang", paint);
 
   $("#toggle").onclick = () => { const p = $("#password"); p.type = p.type === "password" ? "text" : "password"; paint(); };
-  const fill = $("#fill");
-  if (fill) fill.onclick = () => { setMode("login"); $("#email").value = fill.dataset.email; $("#password").value = "demo1234"; };
 
   form.addEventListener("submit", async ev => {
     ev.preventDefault(); clearErr(); go.disabled = true;

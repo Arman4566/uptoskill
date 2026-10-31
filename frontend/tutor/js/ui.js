@@ -37,8 +37,12 @@ const MYMAIL = window.UTS ? UTS.email : "guest";
 const myProf = () => UTSShared.getProfile(MYMAIL);
 const avMe = (s = 44) => { const p = myProf().photo; return p ? `<img class="av ph" src="${p}" alt="Your photo" style="width:${s}px;height:${s}px">` : av(S.me.name, s); };
 function saveProf(patch) { if (!UTSShared.setProfile(MYMAIL, patch)) { toast("Could not save: browser storage is full."); return false; } return true; }
-function syncPublic() {                 // what a student may see on a tutor card
-  UTSShared.setProfile(MYMAIL, { pub: { name: S.me.name, bio: S.me.bio, level: S.me.level, levelName: levelName(S.me.level), skills: S.me.skills, langs: S.me.langs, rating: +avgRating().toFixed(1), reviews: S.ratings.length, sessions: given().length, since: S.me.joined } });
+function syncPublic() {                 // what a student may see on a tutor card (also my open time slots, so students can book them)
+  if (!window.UTSShared || !window.UTS) return;
+  const now = Date.now(), pub = { name: S.me.name, bio: S.me.bio, level: S.me.level, levelName: levelName(S.me.level), skills: S.me.skills, langs: S.me.langs, rating: +avgRating().toFixed(1), reviews: S.ratings.length, sessions: given().length, since: S.me.joined,
+    slots: S.slots.filter(x => !x.booked && x.end > now + 5 * 6e4).sort((a, b) => a.start - b.start).slice(0, 30).map(x => ({ id: x.id, start: x.start, end: x.end })) };
+  const old = myProf().pub;
+  if (!old || JSON.stringify(old) !== JSON.stringify(pub)) UTSShared.setProfile(MYMAIL, { pub });   // unchanged -> nothing to save
 }
 function profileExtras() {
   const p = myProf(), q = p.qualifications || [], v = p.video, cy = new Date().getFullYear();
@@ -241,7 +245,7 @@ const PAGES = {
       <b>Level rules</b><table><tr><th>Level</th><th>Name</th><th>Requirement</th></tr>${LEVELS.map(([l, n]) => `<tr class="${l === m.level ? "hl" : ""}"><td>${l}</td><td>${n}</td><td>${l === 1 ? "Default" : LEVEL_RULES[l][0] + " sessions given" + (LEVEL_RULES[l][1] ? " and rating " + LEVEL_RULES[l][1] + "+" : "")}</td></tr>`).join("")}</table></div>
       <div class="card pad"><b>Settings</b><div class="row"><button class="btn ${S.settings.aiOn ? "" : "ghost"}" data-act="toggleai">AI assistant: ${S.settings.aiOn ? "ON" : "OFF"}</button><span class="mut">Turn off to see that booking and settlement still work. Notes then show "unavailable, retry".</span></div>
       <div class="row"><label class="f" style="flex-direction:row;align-items:center;gap:10px">Simulated platform fee <select class="in" data-chg="fee">${[0, 10, 20].map(p => `<option value="${p}" ${S.settings.feePct === p ? "selected" : ""}>${p}%${p ? " (simulated)" : " (off)"}</option>`).join("")}</select></label><span class="mut">Credits only. No real money is ever moved.</span></div>
-      <div><button class="btn ghost" data-act="reset">Reset demo data</button></div></div>`;
+</div>`;
   },
   room(id) {
     const s = sess(id); if (!s || !["accepted", "in_progress"].includes(s.status)) return empty("Room not available", "This session is not open. Go back to My Sessions.");
@@ -249,7 +253,7 @@ const PAGES = {
     const l = user(s.learnerId);
     return `<div class="phead"><div><h1 class="pt">${esc(s.title)}</h1><p class="mut">Live room with ${esc(l.name)} · ${esc(s.tags.join(", "))} · ${s.minutes} min planned</p></div>
       <div class="row"><span class="chip o timer" title="Session timer">${icon("clock", 14)} <span data-timer="${s.startTs}">00:00</span> / ${s.minutes}:00</span><span class="chip" id="presence"></span></div></div>
-      <div class="card pad notice">${icon("bolt", 16)} Session content is used by the AI assistant to create notes after the session (demo: processed locally in your browser). Only you and the learner can join this room.</div>
+      <div class="card pad notice">${icon("bolt", 16)} Session content is used by the AI assistant to create notes after the session (processed locally in your browser). Only you and the learner can join this room.</div>
       <div id="endreq" class="live" hidden><span class="pulse"></span><div class="info"><b>${esc(l.name)} asked to end the session</b><p>End it to release payment and generate notes.</p></div><button class="btn orange" data-act="endsession" data-id="${s.id}">End session</button></div>
       <div class="room-grid"><div class="card pad"><div class="row"><b>${icon("code", 18)} Shared code editor</b><span class="mut" style="margin-left:auto" id="syncst">Synced</span></div><textarea id="ed" class="code" spellcheck="false" aria-label="Shared code editor"></textarea></div>
       <div class="card pad chat"><b>${icon("help", 18)} Room chat</b><div id="msgs" class="msgs" aria-live="polite"></div><div class="row"><input class="in" id="chat" placeholder="Type a message and press Enter" aria-label="Chat message"><button class="btn" data-act="send" aria-label="Send">${icon("send", 16)}</button></div></div></div>
@@ -259,7 +263,7 @@ const PAGES = {
 };
 function threadCard(c) {
   const name = (c.msgs.find(m => m.from === "student") || {}).name || c.student, id = esc(c.id);
-  return `<div class="card pad thread"><div class="row">${av(name, 40)}<div style="flex:1"><b>${esc(name)}</b><div class="mut">${c.student === "student@demo.com" ? "Demo learner" : esc(c.student)}</div></div>${c.unread ? `<span class="chip o">${c.unread} new</span>` : ""}</div>
+  return `<div class="card pad thread"><div class="row">${av(name, 40)}<div style="flex:1"><b>${esc(name)}</b><div class="mut">${esc(c.student)}</div></div>${c.unread ? `<span class="chip o">${c.unread} new</span>` : ""}</div>
     <div class="msgs" style="height:200px">${c.msgs.map(m => `<div class="msg ${m.from === "tutor" ? "mine" : ""}"><small>${m.from === "tutor" ? "You" : esc(m.name)} · ${clock(m.ts)}</small>${esc(m.text)}</div>`).join("")}</div>
     <div class="row"><input class="in" data-reply="${id}" maxlength="500" placeholder="Write a reply and press Enter" aria-label="Reply to ${esc(name)}"><button class="btn" data-act="msgsend" data-id="${id}">${icon("send", 16)} Reply</button></div></div>`;
 }
@@ -344,9 +348,9 @@ const ACT = {
     const day = new Date(+$("#rs-d").value), [h, m] = ($("#rs-t").value || "").split(":").map(Number); if (isNaN(h)) return toast("Pick the new time");
     day.setHours(h, m, 0, 0); const ts = day.getTime(), reason = $("#rs-r").value, msg = $("#rs-m").value.trim(), l = user(s.learnerId);
     const r = Sess.reschedule(id, ts, reason); if (!ok(r)) return; save(); closeModal();
-    const sent = UTSShared.notify(learnerEmail(s.learnerId), { kind: "reschedule", title: "Lecture rescheduled", mentor: S.me.name, sessionTitle: s.title, fromTs: r.from, toTs: ts, reason,
+    const sent = UTSShared.notify(learnerEmail(s.learnerId), { kind: "reschedule", title: "Lecture rescheduled", mentor: S.me.name, sessionTitle: s.title, ref: s.ref, fromTs: r.from, toTs: ts, reason,
       body: `${S.me.name} moved “${s.title}” from ${when(r.from)} to ${when(ts)}. Reason: ${reason}.${msg ? " Message: " + msg : ""}` });
-    toast(`Moved to ${when(ts)}. Fee ${r.fee} credits. ${sent ? l.name.split(" ")[0] + " was notified." : "Notification saved (this learner has no demo login)."}`); go("sessions");
+    toast(`Moved to ${when(ts)}. Fee ${r.fee} credits. ${sent ? l.name.split(" ")[0] + " was notified." : "This learner is not connected to an account."}`); go("sessions");
   },
   online: () => { S.me.online = !S.me.online; if (S.me.online) S.spawn.inst = Math.min(S.spawn.inst, Date.now() + 4000); save(); toast(S.me.online ? "You are visible for Instant Help" : "You are offline"); go(page, arg, true); },
   togglebrief: id => { T.openReq[id] = !T.openReq[id]; go(page, arg, true); },
@@ -379,7 +383,7 @@ const ACT = {
     const s = sess(id), n = S.notes[id], rt = S.ratings.find(r => r.sid === id);
     const body = !n || n.status === "pending" ? "<p>Generating notes...</p>" : n.status === "unavailable" ? `<p><b>Summary unavailable.</b> ${esc(n.err || "")}</p><button class="btn" data-act="retrynotes" data-id="${id}">${icon("repeat", 16)} Retry</button>` :
       `<p><b>Solved:</b> ${esc(n.solved)}</p><b>Takeaways</b><ul>${n.takeaways.map(t => `<li>${esc(t)}</li>`).join("")}</ul><b>Next steps</b><ul>${n.next_steps.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`;
-    modal(`<h3>${esc(s.title)}</h3><p class="mut">with ${esc(user(s.learnerId).name)}${rt ? " · rated " + rt.stars + "★" : ""} · AI notes (demo)</p>${body}${n && n.finalCode ? `<b>Final code</b><pre class="pre">${esc(n.finalCode)}</pre>` : ""}<div class="row"><button class="btn ghost" data-act="close">Close</button></div>`, 1);
+    modal(`<h3>${esc(s.title)}</h3><p class="mut">with ${esc(user(s.learnerId).name)}${rt ? " · rated " + rt.stars + "★" : ""} · AI notes</p>${body}${n && n.finalCode ? `<b>Final code</b><pre class="pre">${esc(n.finalCode)}</pre>` : ""}<div class="row"><button class="btn ghost" data-act="close">Close</button></div>`, 1);
   },
   retrynotes: id => { const s = sess(id); closeModal(); s.noteStatus = "pending"; save(); toast("Retrying..."); genNotes(s); setTimeout(() => ACT.notes(id), 1000); },
   claim: id => {
@@ -408,9 +412,7 @@ const ACT = {
   addskill: () => { const v = ($("#ps") || {}).value; if (!v) return toast("You already have every skill"); S.me.skills.push({ n: v, exp: 1 }); save(); go("profile", null, true); },
   rmskill: id => { if (S.me.skills.length === 1) return toast("Keep at least one skill"); S.me.skills.splice(+id, 1); save(); go("profile", null, true); },
   toggleai: () => { S.settings.aiOn = !S.settings.aiOn; save(); toast("AI assistant " + (S.settings.aiOn ? "on" : "off")); go("profile", null, true); },
-  reset: () => modal(`<h3>Reset demo data?</h3><p class="mut">All sessions, credits and settings return to the starting sample data.</p><div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn orange" data-act="resetyes">Reset</button></div>`),
   logout: () => UTSAuth.logout("login.html"),
-  resetyes: () => { Object.keys(localStorage).filter(k => k.startsWith("uptoskill_tutor")).forEach(k => localStorage.removeItem(k)); S = seed(); save(); closeModal(); toast("Demo data reset"); go("dashboard"); },
   close: closeModal
 };
 const CHG = {
@@ -431,27 +433,46 @@ function learnerView(id, token) {
   const l = user(s.learnerId);
   $("#nav").remove(); $(".app").style.display = "block";
   $("#main").innerHTML = `<div class="phead"><div><img class="logo-full" src="../assets/logo.png" alt="UpToSkill" style="height:30px"><h1 class="pt" style="margin-top:10px">${esc(s.title)}</h1><p class="mut">Learner view: ${esc(l.name)} · mentor ${esc(S.me.name)}</p></div><div class="row"><span class="chip" id="presence"></span></div></div>
-    <div class="card pad notice">${icon("bolt", 16)} Session content is used by the AI assistant to create notes after the session (demo). This window simulates the learner.</div>
+    <div class="card pad notice">${icon("bolt", 16)} Session content is used by the AI assistant to create notes after the session (processed locally in your browser). This window simulates the learner.</div>
     <div class="room-grid"><div class="card pad"><b>${icon("code", 18)} Shared code editor</b><textarea id="ed" class="code" spellcheck="false" aria-label="Shared code editor"></textarea></div>
     <div class="card pad chat"><b>${icon("help", 18)} Room chat</b><div id="msgs" class="msgs"></div><div class="row"><input class="in" id="chat" placeholder="Type a message and press Enter"><button class="btn" id="lsend" aria-label="Send">${icon("send", 16)}</button></div></div></div>
     <div class="row"><button class="btn ghost" id="lend">Ask mentor to end the session</button></div>`;
   initRoom(id, "learner"); $("#lsend").onclick = () => sendChat(id, "learner"); $("#lend").onclick = () => { roomSet(id, r => r.endReq = true); toast("Mentor notified"); };
 }
 
-/* ---------- a learner delayed a lecture (sent from the student app) ---------- */
+/* ---------- messages from the student app: new booking, cancellation, delay, rating ---------- */
 function checkStudentNotifs() {
   if (learnerMode || !window.UTSShared) return;
   const un = UTSShared.tutorNotifications(MYMAIL).filter(n => !n.read); if (!un.length) return;
-  const lines = [];
+  S.handled = S.handled || [];
+  const lines = [], byRef = (ref, ...st) => S.sessions.find(x => x.ref === ref && (!st.length || st.includes(x.status)));
   un.forEach(n => {
-    if (n.kind !== "delay") return;
+    if (S.handled.includes(n.id)) return; S.handled.push(n.id);
     const name = n.studentName || "A learner";
-    const s = S.sessions.filter(x => x.status === "accepted" && learnerEmail(x.learnerId) === n.fromStudent).sort((a, b) => Math.abs(a.slotTs - n.fromTs) - Math.abs(b.slotTs - n.fromTs))[0];
-    if (!s) { lines.push([`${name} delayed a lecture`, `“${n.sessionTitle}” was moved to ${when(n.toTs)}. Reason: ${n.reason}. It is not an accepted session in your list, so nothing changed here.`]); return; }
-    const old = s.slotTs, sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; }
-    s.slotId = null; s.slotTs = n.toTs; s.delays = (s.delays || []).concat([{ from: old, to: n.toTs, fee: n.fee || 0, reason: n.reason, ts: n.ts }]);
-    if (n.fee) addLedger("me", n.fee, "delay_fee", "delay", n.id, `Delay fee: ${name} (${s.title})`);
-    lines.push([`${name} delayed a lecture`, `“${s.title}” moved from ${when(old)} to ${when(n.toTs)}. Reason: ${n.reason}.${n.note ? " Message: " + n.note : ""}${n.fee ? ` You received ${n.fee} credits as delay fee.` : ""}`]);
+    if (n.kind === "booking") {
+      if (byRef(n.ref)) return;                                                     // already created from this request
+      const lid = ensureLearner(n.fromStudent, name, n.level, n.langs), ai = AI.analyze(n.problem || n.title), slot = n.slotId ? S.slots.find(x => x.id === n.slotId) : null;
+      const s = { id: S.nid++, ref: n.ref, prepaid: true, type: n.instant ? "instant" : "booked", status: "requested", learnerId: lid, title: n.title, problem: n.problem || n.title, tags: ai.tags, difficulty: ai.difficulty,
+        minutes: n.minutes, credits: n.credits, brief: { problem_summary: ai.problem_summary, already_tried: ai.already_tried, topics_to_prepare: ai.topics_to_prepare },
+        slotId: slot && !slot.booked ? slot.id : null, slotTs: n.ts, reqTs: Date.now(), token: uid() };
+      S.sessions.push(s);
+      lines.push([`New session request from ${name}`, `“${n.title}” · ${n.minutes} min · ${n.credits} credits · ${n.instant ? "wants help now" : when(n.ts)}. Open My Sessions to accept or decline.`]);
+    } else if (n.kind === "cancel") {
+      const s = byRef(n.ref, "requested", "accepted"); if (!s) return;
+      s.status = "cancelled"; s.endTs = Date.now(); const sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; }
+      lines.push([`${name} cancelled a session`, `“${s.title}” was cancelled by the learner. Their credits were refunded.`]);
+    } else if (n.kind === "rating") {
+      const s = byRef(n.ref); if (!s) return;
+      s.pendingRating = n.stars;                                                     // counted when the session is completed
+      if (s.status === "completed") s.rateAt = Date.now() + 200;
+    } else if (n.kind === "delay") {
+      const s = byRef(n.ref, "requested", "accepted") || S.sessions.filter(x => x.status === "accepted" && learnerEmail(x.learnerId) === n.fromStudent).sort((a, b) => Math.abs(a.slotTs - n.fromTs) - Math.abs(b.slotTs - n.fromTs))[0];
+      if (!s) { lines.push([`${name} delayed a lecture`, `“${n.sessionTitle}” was moved to ${when(n.toTs)}. Reason: ${n.reason}. It is not an open session in your list, so nothing changed here.`]); return; }
+      const old = s.slotTs, sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; }
+      s.slotId = null; s.slotTs = n.toTs; s.delays = (s.delays || []).concat([{ from: old, to: n.toTs, fee: n.fee || 0, reason: n.reason, ts: n.ts }]);
+      if (n.fee) addLedger("me", n.fee, "delay_fee", "delay", n.id, `Delay fee: ${name} (${s.title})`);
+      lines.push([`${name} delayed a lecture`, `“${s.title}” moved from ${when(old)} to ${when(n.toTs)}. Reason: ${n.reason}.${n.note ? " Message: " + n.note : ""}${n.fee ? ` You received ${n.fee} credits as delay fee.` : ""}`]);
+    }
   });
   save(); UTSShared.markTutorRead(MYMAIL);
   if (!lines.length) return;
@@ -475,6 +496,6 @@ window.addEventListener("uts-change", () => { if (!learnerMode) refresh(); });
 (function boot() {
   const q = new URLSearchParams(location.search);
   if (q.get("as") === "learner" && q.get("room")) { learnerMode = true; return learnerView(q.get("room"), q.get("t")); }
-  const h = location.hash.slice(1).split("/"), start = PAGES[h[0]] && h[0] !== "room" ? h[0] : "dashboard"; go(start); checkStudentNotifs();
+  const h = location.hash.slice(1).split("/"), start = PAGES[h[0]] && h[0] !== "room" ? h[0] : "dashboard"; syncPublic(); go(start); checkStudentNotifs();
   setInterval(tick, 1000);
 })();

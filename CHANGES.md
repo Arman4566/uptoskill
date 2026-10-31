@@ -71,3 +71,26 @@ The update was built on an older snapshot (no mentors/slots routes, no `back.js`
   - Student "Join room" dialog no longer removed the end-session + rating step (sessions could not be completed); the rating buttons are back under the join field.
   - Tutor button "Video call (Jitsi)" is now "Open virtual classroom".
   - The public token endpoint is rate limited (20 per minute per IP); empty collaboration rooms are freed after 10 minutes.
+
+## Round 6 (no demo data, everything saved in the database)
+**Demo accounts and sample data removed**
+- Deleted: `student@demo.com`, `tutor@demo.com` and the `@demo.test` people (seed), the demo-login rows on both login pages, the five built-in sample tutors, the sample sessions / doubts / requests / bounties / leaderboard, "Add 5 demo credits", "Reset demo data", the automatic "tutor accepted after 5 seconds" and the canned chat replies.
+- `npm run db:migrate` now also deletes any demo accounts (and all their data) that are already in your database. `npm run db:seed` only adds skill tags. `npm run db:purge-demo` does the deletion on its own.
+- There are no browser-only accounts any more (offline mode removed): sign-up and login always go to the server and say so if it is not running.
+
+**Everything you add in the frontend is saved in the database**
+- New tables (created by `db:migrate`): `user_state` (each account's private app data), `shared_items` (tutor profiles, chat threads, notifications), `tutor_videos` (intro videos). New API: `backend/routes/state.js`.
+- New `frontend/shared/sync.js`: before an app opens it downloads the account's data from the database; every save after that is sent to the server; chats, notifications and tutor profiles from other accounts arrive within about 5 seconds. If saving fails a red bar says so and it retries.
+- Data that real users had already saved in their own browser with the previous version is uploaded to the database the first time they open the app (old sample-data copies are ignored).
+- Intro video: now uploaded to the database (max 100 MB, 1 minute), so students on other devices can watch it.
+
+**Students and tutors now really talk to each other**
+- The student's tutor list comes from the tutors' public profiles (name, level, skills, languages, photo, qualifications, rating, open slots).
+- Booking: the student picks one of the tutor's open slots (or another time); credits are held; the request appears in the tutor app. Tutor accept / decline / cancel / no-show / expiry (24 h) updates the student's app and refunds credits when needed. Student cancel, delay and the star rating go back to the tutor (the rating is the real one; the tutor's payout and 5-star bonus use it).
+- Instant Help sends a request to the best matching real tutor instead of pretending it was accepted.
+- Tutor leaderboard uses the other real tutors.
+
+**Known limits**
+- Credits inside the student and tutor apps are still bookkeeping done in the browser (as before); only the Live Lessons part has a server-side ledger.
+- The old simulated "live room" in the tutor app still works only inside one browser; use the virtual classroom for real calls.
+- The `backend/.env` in the zip still holds real-looking secrets: rotate the database password, `JWT_SECRET` and LiveKit keys, and keep `.env` out of any zip you share.

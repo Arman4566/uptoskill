@@ -17,7 +17,7 @@ In Render → existing UpToSkill backend service → Environment, add:
 
 Keep your existing Neon `DATABASE_URL` and `JWT_SECRET` values in Render; do not copy them into source files. The virtual classroom does not require a database migration.
 
-Ensure the Render backend build/install command is `npm install` and its start command is `npm start`. This feature adds `livekit-server-sdk` and `socket.io`; if your build command is `npm ci`, change it to `npm install` so the new dependencies can be resolved.
+Ensure the Render backend build/install command is `npm install` and its start command is `npm start`. The supplied lockfile was stale and did not include `livekit-server-sdk` and `socket.io`, so it has been omitted from this corrected archive. Use `npm install` for the first install/deploy; after installing with registry access, generate a fresh lockfile with `npm install --package-lock-only` and commit it if you want to use `npm ci` later.
 
 ## 3. Configure the frontend's API URL
 
@@ -52,4 +52,4 @@ The invite link is a bearer invitation: anyone who has it can join. Do not post 
 
 ## Important current limitation
 
-The original supplied frontend uses browser-local demo authentication/session state. The room token endpoint therefore uses a hard-to-guess room invite rather than checking a database-backed session membership record. This is suitable for a prototype/demo only. Before using the room for private or paid classes, connect it to real backend authentication and authorize the exact student and tutor for each session. Collaboration state is currently in backend memory and is cleared if the backend restarts.
+Sessions booked in the student and tutor apps are saved in the database, but the classroom token endpoint does not check them. The room token endpoint therefore uses a hard-to-guess room invite rather than checking a database-backed session membership record. This is suitable for a prototype/demo only. Before using the room for private or paid classes, connect it to real backend authentication and authorize the exact student and tutor for each session. Collaboration state is currently in backend memory and is cleared if the backend restarts.

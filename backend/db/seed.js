@@ -8,12 +8,8 @@ const sql = fs.readFileSync(path.join(here, 'seed.sql'), 'utf8');
 
 try {
   await pool.query(sql);
-  const { rows } = await pool.query(
-    `SELECT (SELECT COUNT(*) FROM users WHERE email ~ '@demo\\.(test|com)$')::int AS users,
-            (SELECT COUNT(*) FROM skills)::int AS skills,
-            (SELECT COUNT(*) FROM availability_slots)::int AS slots`
-  );
-  console.log('seeded:', rows[0], '| demo password: demo1234 (student@demo.com, tutor@demo.com)');
+  const { rows } = await pool.query('SELECT (SELECT COUNT(*) FROM skills)::int AS skills, (SELECT COUNT(*) FROM users)::int AS users');
+  console.log('seeded skill tags:', rows[0], '(no demo accounts are created)');
 } catch (err) {
   console.error('seed failed - did you run `npm run db:migrate` first?', err.message);
   process.exitCode = 1;

@@ -1,6 +1,6 @@
-/* UpToSkill Tutor - AI layer (demo).
+/* UpToSkill Tutor - AI layer.
    Golden rule from the plan: logic in code, language in AI. Prices, matching and level checks never read AI output.
-   This demo runs a small rule-based writer locally so it works offline. To use a real LLM, replace the body of
+   This runs a small rule-based writer locally so it works offline. To use a real LLM, replace the body of
    AI.analyze / AI.summarize with a fetch() call that returns the same JSON shape (see README). */
 "use strict";
 const KEYWORDS = {

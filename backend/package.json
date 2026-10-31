@@ -9,6 +9,7 @@
     "db:migrate": "node db/migrate.js",
     "db:reset": "node db/migrate.js --reset",
     "db:seed": "node db/seed.js",
+    "db:purge-demo": "node db/purge-demo.js",
     "test:race": "node scripts/race-test.js"
   },
   "engines": {

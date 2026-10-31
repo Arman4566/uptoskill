@@ -1,4 +1,5 @@
-/* UpToSkill dummy app - all data is saved in your browser (localStorage). Profile > Reset demo data to start over. */
+/* UpToSkill student app. Everything you do here is saved to the database (shared/sync.js saves it and loads it on the next sign-in).
+   Tutors, their open time slots and chats come from real tutor accounts; bookings reach the tutor app as requests. */
 const $ = s => document.querySelector(s);
 const KEY = "uptoskill_v1:" + (window.UTS ? UTS.email : "guest"); // one saved profile per account
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -8,23 +9,10 @@ const BADGES = [
   { days: 1, name: "Starter", icon: "flame" }, { days: 7, name: "Week", icon: "bolt" },
   { days: 15, name: "Focus", icon: "star" }, { days: 30, name: "Pro", icon: "medal" }, { days: 50, name: "Legend", icon: "trophy" }
 ];
-const TUTORS = [
-  { ini: "NS", name: "Neha Sharma",  email: "tutor@demo.com", level: 3, levelName: "Mentor", rating: 4.8, reviews: 17, sessions: 17, yrs: 1.3, skills: ["React", "JavaScript"],         langs: ["English", "Hindi"], slots: ["today"],             color: "#1D4ED8",
-    bio: "Final-year CS student. I love explaining React and SQL with small, runnable examples.", quals: [{ deg: "B.Tech Computer Science", inst: "Delhi Technological University", year: 2027 }] },
-  { ini: "VJ", name: "Vikram Joshi", level: 4, levelName: "Guide",  rating: 4.7, reviews: 28, sessions: 31, yrs: 5, skills: ["React", "Node"],               langs: ["English"],          slots: ["tomorrow"],          color: "#C2570C",
-    bio: "Backend engineer who mentors on Node and React. I debug step by step and explain why, not just what.", quals: [{ deg: "M.Sc Information Technology", inst: "IIIT Delhi", year: 2022 }] },
-  { ini: "IR", name: "Ishita Rao",   level: 2, levelName: "Helper", rating: 4.6, reviews: 6,  sessions: 6,  yrs: 2, skills: ["JavaScript", "Python", "DSA"], langs: ["English", "Hindi"], slots: ["today", "tomorrow"], color: "#0B2A6F",
-    bio: "Python and DSA coach. I focus on small habits that make code easier to read and debug.", quals: [{ deg: "B.Sc Computer Science", inst: "Miranda House, Delhi University", year: 2024 }] },
-  { ini: "KM", name: "Karan Mehta",  level: 4, levelName: "Guide",  rating: 4.9, reviews: 25, sessions: 27, yrs: 6, skills: ["SQL", "Node"],                 langs: ["English", "Hindi"], slots: ["tomorrow"],          color: "#1D4ED8",
-    bio: "Database engineer. Joins, indexes and query plans explained with real tables.", quals: [{ deg: "B.Tech Information Technology", inst: "NSUT, Delhi", year: 2020 }] },
-  { ini: "SQ", name: "Sana Qureshi", level: 3, levelName: "Mentor", rating: 4.5, reviews: 11, sessions: 12, yrs: 3, skills: ["Python", "DSA"],               langs: ["English", "Hindi"], slots: ["today"],             color: "#0B2A6F",
-    bio: "Python and DSA mentor. Patient with beginners and strong on interview problems.", quals: [{ deg: "MCA", inst: "Jamia Millia Islamia", year: 2023 }] }
-];
 const COST = { 15: 2, 30: 4, 45: 6 };                       // same lengths and prices as the server (backend/lib/price.js)
-const SLOT = { today: ["Today", "6:00 PM"], tomorrow: ["Tomorrow", "11:00 AM"] };
 
 /* ---------- small helpers ---------- */
-const HR = 36e5, DAY = 864e5;
+const HR = 36e5, DAY = 864e5, uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const round2 = n => Math.round(n * 100) / 100, fmt = n => +round2(+n).toFixed(2);
 const startOfDay = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 function parseWhen(day, time) {                               // "Today" + "4:30 PM" -> timestamp (only used for sessions saved before timestamps existed)
@@ -40,33 +28,30 @@ const DELAY = { pct: 10, max: 2, maxDays: 14 };
 const delayFee = credits => round2(credits * DELAY.pct / 100);
 const delayBlock = s => s.day === "Now" ? "Instant help cannot be delayed." : (s.delays || []).length >= DELAY.max ? `A lecture can be delayed at most ${DELAY.max} times.` : "";
 
-/* tutor card data = static demo tutor + (for the live demo tutor) whatever she saved in her own app: photo, qualifications, video, rating, skills */
-function tutorView(t) {
-  const p = t.email && window.UTSShared ? UTSShared.getProfile(t.email) : null, pub = p && p.pub, v = { ...t, photo: "", video: null, live: !!t.email };
-  if (p) {
-    v.photo = p.photo || ""; v.video = p.video || null;
-    if (p.qualifications && p.qualifications.length) v.quals = p.qualifications;
-    if (pub) {
-      v.rating = pub.rating || t.rating; v.reviews = pub.reviews ?? t.reviews; v.sessions = pub.sessions ?? t.sessions; if (pub.bio) v.bio = pub.bio;
-      if (pub.skills && pub.skills.length) v.skills = pub.skills.map(s => s.n);
-      if (pub.langs && pub.langs.length) v.langs = pub.langs;
-      if (pub.level) { v.level = pub.level; v.levelName = pub.levelName; }
-      if (pub.since) v.yrs = Math.max(.1, (Date.now() - pub.since) / (365.25 * DAY));
-    }
-  }
-  return v;
+/* The tutor list is built from the tutors' public profiles in the database: name, level, skills, photo, qualifications,
+   rating and the open time slots each tutor added in the tutor app. There are no built-in sample tutors. */
+const COLORS = ["#1D4ED8", "#C2570C", "#0B2A6F"];
+const iniOf = n => String(n).split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "T";
+function allTutors() {
+  const profs = window.UTSShared ? UTSShared.profiles() : {};
+  return Object.keys(profs).filter(em => em !== UTS.email && profs[em].pub).map(em => {
+    const p = profs[em], pub = p.pub, name = pub.name || em.split("@")[0];
+    return { id: em, ini: iniOf(name), name, email: em, live: true, color: COLORS[(name.charCodeAt(0) + name.length) % COLORS.length],
+      level: pub.level || 2, levelName: pub.levelName || "Helper", rating: pub.rating || 0, reviews: pub.reviews || 0, sessions: pub.sessions || 0,
+      yrs: pub.since ? Math.max(.1, (Date.now() - pub.since) / (365.25 * DAY)) : .1,
+      skills: (pub.skills || []).map(x => x.n), langs: pub.langs && pub.langs.length ? pub.langs : ["English"], bio: pub.bio || "",
+      quals: p.qualifications || [], photo: p.photo || "", video: p.video || null, slots: (pub.slots || []).filter(x => x.start > Date.now()) };
+  });
 }
-const tutorByIni = ini => { const t = TUTORS.find(x => x.ini === ini); return t ? tutorView(t) : null; };
-const tutorByName = n => { const t = TUTORS.find(x => x.name === n); return t ? tutorView(t) : null; };
+const tutorById = id => allTutors().find(t => t.id === id) || null;
+const tutorOfSession = s => (s.mentorEmail && tutorById(s.mentorEmail)) || allTutors().find(t => t.name === s.mentor) || null;
 const expText = y => y < 1 ? "Under 1 yr" : (Number.isInteger(y) ? y : y.toFixed(1)) + " yrs";
 const tAv = (t, s = 48) => t.photo ? `<img class="av ph" src="${t.photo}" alt="${esc(t.name)}" style="width:${s}px;height:${s}px">` :
   `<span class="av" style="background:${t.color};width:${s}px;height:${s}px;font-size:${Math.round(s * .34)}px">${t.ini}</span>`;
 const qualYear = x => x.year > new Date().getFullYear() ? "Pursuing, " + x.year : x.year;
 
-/* Sample data is only for the demo login (student@demo.com). Every other account starts empty with the 10 welcome credits
-   (the same starter amount the server gives on sign-up). */
-const IS_DEMO = !window.UTS || UTS.email === "student@demo.com";
-function freshSeed() {
+/* A new student starts with an empty account and the 10 welcome credits (the same starter amount the server gives on sign-up). */
+function seed() {
   return {
     user: { name: window.UTS ? UTS.name : "Student", level: 1, levelName: "Newcomer", skills: [], mentor: false },
     credits: 10, done: 0, mins: 0, nid: 10,
@@ -75,40 +60,13 @@ function freshSeed() {
     ledger: [{ d: "Today", t: "Welcome credits", a: 10 }],
     doubts: [],
     incoming: [],
-    fresh: true                                            // marks "created clean" so old demo copies saved by earlier versions are dropped
-  };
-}
-function seed() {
-  if (!IS_DEMO) return freshSeed();
-  return {
-    user: { name: window.UTS ? UTS.name : "Riya Verma", level: 1, levelName: "Newcomer", skills: ["React", "SQL"], mentor: false },
-    credits: 8, done: 4, mins: 120, nid: 10,
-    streak: { days: 1, goal: 50, last: ymd(-1) },
-    sessions: [
-      { id: 1, ts: parseWhen("Today", "4:30 PM"), day: "Today", time: "4:30 PM", title: "Fix useEffect infinite loop", mentor: "Neha Sharma", skill: "React", level: 3, min: 30, credits: 4, status: "accepted" },
-      { id: 2, ts: parseWhen("Tomorrow", "11:00 AM"), day: "Tomorrow", time: "11:00 AM", title: "SQL joins returning duplicates", mentor: "Karan Mehta", skill: "SQL", level: 4, min: 15, credits: 2, status: "requested" },
-      { id: 3, ts: parseWhen("Yesterday", "5:00 PM"), day: "Yesterday", time: "5:00 PM", title: "Python dictionaries basics", mentor: "Ishita Rao", skill: "Python", level: 2, min: 30, credits: 4, status: "completed", rating: 5 }
-    ],
-    ledger: [
-      { d: "Yesterday", t: "Welcome credits", a: 18 },
-      { d: "Yesterday", t: "Session with Ishita Rao", a: -4 },
-      { d: "Today", t: "Held: Fix useEffect infinite loop", a: -4 },
-      { d: "Today", t: "Held: SQL joins returning duplicates", a: -2 }
-    ].reverse(),
-    doubts: [
-      { id: 1, title: "Why does my map() return undefined?", tag: "JavaScript", by: "Aman K.", solved: false, replies: [{ by: "Ishita Rao", text: "Check that you return inside the callback." }] },
-      { id: 2, title: "Difference between INNER and LEFT JOIN?", tag: "SQL", by: "Pooja S.", solved: true, replies: [] }
-    ],
-    incoming: [
-      { id: 1, student: "Rohit D.", topic: "Node.js express routing", min: 30, credits: 4 },
-      { id: 2, student: "Meera P.", topic: "React props vs state", min: 15, credits: 2 },
-      { id: 3, student: "Arjun T.", topic: "SQL group by", min: 45, credits: 6 }
-    ]
+    handled: [],                                           // ids of notifications already applied (never apply one twice)
+    fresh: true
   };
 }
 let S = (() => {
   let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { }
-  if (saved && !IS_DEMO && !saved.fresh) saved = null;      // an earlier version copied the demo data into new accounts: start clean once
+  if (saved && !saved.fresh) saved = null;                  // copies of the old sample data are ignored
   return saved || seed();
 })();
 S.sessions.forEach(s => { if (!s.ts) s.ts = parseWhen(s.day, s.time); });      // older saved data
@@ -150,10 +108,10 @@ const icon = (n, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" 
 /* ---------- matching ---------- */
 function matchTutors({ topic, language, slot }) {
   const q = topic.trim().toLowerCase();
-  return TUTORS.map(tutorView).filter(t => t.level > S.user.level).map(t => {
+  return allTutors().filter(t => t.level > S.user.level).map(t => {
     const skill = !q || t.skills.some(s => s.toLowerCase().includes(q)) ? 40 : 0;
     const lang = language === "Any" || t.langs.includes(language) ? 15 : 0;
-    const time = slot === "Any" || t.slots.includes(slot.toLowerCase()) ? 20 : 0;
+    const time = slot === "Any" || t.slots.some(x => dayLabel(x.start) === slot) ? 20 : 0;
     const rate = Math.round(t.rating / 5 * 15), gap = Math.min(t.level - S.user.level, 3) * 3 + 1;
     const why = [skill && "matches your topic", lang && "speaks your language", time && "is free in your time slot"].filter(Boolean);
     return { ...t, skill, score: skill + lang + time + rate + gap, why: why.length ? "Good fit: " + why.join(", ") + "." : "Lower match for your filters." };
@@ -205,12 +163,12 @@ function updateTutors() {
 }
 const qualLine = t => { const q = t.quals[0]; return q ? `${esc(q.deg)} · ${esc(q.inst)}${q.year > new Date().getFullYear() ? " (pursuing)" : ""}` : "Qualification not added yet"; };
 function tutorCard(t) {
-  return `<div class="card tutor" data-lift="tutor:${t.ini}">
+  return `<div class="card tutor" data-lift="tutor:${t.id}">
     <div class="top">${tAv(t, 56)}<div class="nm"><div class="name">${esc(t.name)}</div><div class="lv">Level ${t.level} ${t.levelName}</div></div><span class="chip o" title="Match score ${t.score} out of 100">${t.score}% match</span></div>
-    <div class="facts"><span class="rt">${icon("star", 14)} <b>${(+t.rating).toFixed(1)}</b> (${t.reviews})</span><span>${expText(t.yrs)} experience</span><span>${t.sessions} sessions</span></div>
+    <div class="facts"><span class="rt">${icon("star", 14)} ${t.reviews ? `<b>${(+t.rating).toFixed(1)}</b> (${t.reviews})` : "<b>New</b>"}</span><span>${expText(t.yrs)} experience</span><span>${t.sessions} sessions</span></div>
     <div class="qual">${icon("cap", 16)}<span>${qualLine(t)}</span></div>
     <div class="tags">${t.skills.map(s => `<span class="chip">${esc(s)}</span>`).join("")}</div><p class="why">${t.why}</p>
-    <div class="foot"><button class="btn ghost" data-act="chat" data-id="${t.ini}">${icon("chat", 18)} Chat</button><button class="btn ghost" data-act="lift">View profile</button><button class="btn" data-act="book" data-id="${t.ini}">Book</button></div></div>`;
+    <div class="foot"><button class="btn ghost" data-act="chat" data-id="${t.id}">${icon("chat", 18)} Chat</button><button class="btn ghost" data-act="lift">View profile</button><button class="btn" data-act="book" data-id="${t.id}">Book</button></div></div>`;
 }
 function sessionHTML(l) {
   const st = { accepted: ["g", "Accepted"], requested: ["n", "Waiting for mentor"], completed: ["g", "Completed" + (l.rating ? ` · ${l.rating}★` : "")], cancelled: ["n", "Cancelled"] }[l.status];
@@ -264,14 +222,12 @@ const PAGES = {
     const tot = S.ledger.filter(l => l.a > 0 && /Earned/.test(l.t)).reduce((n, l) => n + l.a, 0);
     return head("Credits & Ledger", "Every credit movement, in one place.") +
       `<div class="stats">${[["Available", fmt(S.credits)], ["In escrow", escrow()], ["Earned as mentor", tot]].map(s => `<div class="card stat"><div><small>${s[0]}</small><b>${s[1]}</b></div></div>`).join("")}</div>
-      ${IS_DEMO ? `<div><button class="btn orange" data-act="buy">${icon("wallet", 18)} Add 5 demo credits</button></div>` : ""}
       <div class="card" style="overflow-x:auto"><table><tr><th>When</th><th>Details</th><th>Credits</th></tr>${S.ledger.map(l => `<tr><td>${l.d}</td><td>${esc(l.t)}</td><td class="${l.a > 0 ? "pos" : l.a < 0 ? "neg" : ""}">${l.a > 0 ? "+" : ""}${l.a || "released"}</td></tr>`).join("")}</table></div>`;
   },
   leaderboard() {
     const pts = S.done * 10 + S.streak.days * 5;
-    const rows = (IS_DEMO ? [["Ananya Gupta", 420], ["Dev Malhotra", 365], ["Kavya Nair", 310], ["Aman Khan", 205], ["Pooja Singh", 40]] : []).concat([[S.user.name + " (You)", pts, 1]]).sort((a, b) => b[1] - a[1]);
-    return head("Leaderboard", "Points: 10 per session + 5 per streak day.") + (IS_DEMO ? "" : `<div class="empty"><b>Just you for now</b>Other learners show up here as they join and finish sessions.</div>`) +
-      rows.map((r, i) => `<div class="card lb ${r[2] ? "you" : ""}"><span class="n">#${i + 1}</span><span class="nm">${esc(r[0])}</span><span class="chip ${r[2] ? "o" : ""}">${r[1]} pts</span></div>`).join("");
+    return head("Leaderboard", "Points: 10 per session + 5 per streak day.") + `<div class="empty"><b>Just you for now</b>Only your own points are shown. Other learners' points are not shared.</div>` +
+      `<div class="card lb you"><span class="n">#1</span><span class="nm">${esc(S.user.name)} (You)</span><span class="chip o">${pts} pts</span></div>`;
   },
   profile() {
     return head("Profile", "Edit your details and switch between student and mentor mode.") +
@@ -280,7 +236,7 @@ const PAGES = {
       <div class="row"><input class="in" id="ps" placeholder="Add a skill"><button class="btn ghost" data-act="addskill">Add skill</button></div></div>
       <div class="card pad"><b>Mentor mode</b><p class="mut">Switch on to see incoming session requests and earn credits.</p>
       <div><button class="btn ${S.user.mentor ? "orange" : ""}" data-act="mentor">${S.user.mentor ? "Mentor mode is ON - turn off" : "Turn on mentor mode"}</button></div></div>
-      <div><button class="btn ghost" data-act="reset">${IS_DEMO ? "Reset demo data" : "Reset my data"}</button></div>`;
+`;
   },
   requests() {
     return head("Session Requests", "Accept a request to earn its credits.") +
@@ -292,19 +248,16 @@ const PAGES = {
 };
 
 /* ---------- actions ---------- */
-function autoAccept(id) {
-  setTimeout(() => {
-    const s = S.sessions.find(x => x.id === id);
-    if (s && s.status === "requested") { s.status = "accepted"; save(); toast(`${s.mentor} accepted your request`); rerender(); }
-  }, 5000);
-}
 function rerender() { if (page !== "dashboard" && page !== "sessions") return; if (Lift.isOpen) Lift.afterClose(() => go(page)); else go(page); }   // never redraw under an open card
-function addSession(t, title, day, time, min, status) {
+/* Books a session: holds the credits here and sends a request to the tutor (it shows up in their tutor app). */
+function addSession(t, title, ts, min, instant, slotId) {
   const cost = COST[min];
   if (S.credits < cost) { toast(`Not enough credits (need ${cost})`); return null; }
   S.credits = round2(S.credits - cost); log(`Held: ${title}`, -cost);
-  const s = { id: S.nid++, ts: parseWhen(day, time), day, time, title, mentor: t.name, skill: t.skills[0], level: t.level, min, credits: cost, status };
-  S.sessions.push(s); save(); return s;
+  const s = { id: S.nid++, ref: uid(), ts, day: instant ? "Now" : dayLabel(ts), time: instant ? "Now" : clockLabel(ts), title, mentor: t.name, mentorEmail: t.email, skill: t.skills[0] || "General", level: t.level, min, credits: cost, status: "requested", slotId: slotId || null };
+  S.sessions.push(s); save();
+  UTSShared.notifyTutor(t.email, { kind: "booking", ref: s.ref, fromStudent: UTS.email, studentName: S.user.name, level: S.user.level, title, problem: title, minutes: min, credits: cost, ts, slotId: slotId || null, instant: !!instant });
+  return s;
 }
 function tick() { const k = S.streak, t = ymd(0); if (k.last === t) return; k.days = k.last === ymd(-1) ? k.days + 1 : 1; k.last = t; }
 
@@ -315,13 +268,13 @@ function liftCard(card) {
   const [kind, id] = card.dataset.lift.split(":"), html = kind === "tutor" ? tutorDetail(id) : sessionDetail(id); if (!html) return;
   Lift.open(card, html, {
     label: kind === "tutor" ? "Tutor profile" : "Lecture details",
-    onShown: () => { if (kind === "tutor") loadProfileVideo(tutorByIni(id)); },
+    onShown: () => { if (kind === "tutor") loadProfileVideo(tutorById(id)); },
     onClose: () => { if (liftURL) { URL.revokeObjectURL(liftURL); liftURL = ""; } }
   });
 }
 const closeBtn = `<button class="ib lf-x" data-act="liftclose" aria-label="Close">${icon("x", 18)}</button>`;
 function tutorDetail(ini) {
-  const t = tutorByIni(ini); if (!t) return "";
+  const t = tutorById(ini); if (!t) return "";
   const v = t.video, first = t.name.split(" ")[0];
   return `<div class="lf-detail">${closeBtn}
     <div class="lf-head">${tAv(t, 84)}<div><h3>${esc(t.name)}</h3><div class="mut">Level ${t.level} ${t.levelName}</div><div class="rt big">${icon("star", 16)} <b>${(+t.rating).toFixed(1)}</b> <span class="mut">(${t.reviews} reviews)</span></div></div></div>
@@ -331,15 +284,19 @@ function tutorDetail(ini) {
     <div><b>Skills</b><div class="tags" style="margin-top:6px">${t.skills.map(s => `<span class="chip">${esc(s)}</span>`).join("")}</div></div>
     <div><b>Intro video</b>${v ? `<div class="vwrap ${v.ratio === "9:16" ? "portrait" : "land"}"><video id="lfv" controls playsinline preload="metadata" aria-label="Intro video of ${esc(t.name)}"></video></div><p class="mut">${v.ratio} · ${Math.round(v.duration)} s</p>`
       : `<div class="empty" style="margin-top:6px">${esc(first)} has not added an intro video yet.</div>`}</div>
-    <div class="row lf-act"><button class="btn ghost" data-act="chat" data-id="${t.ini}">${icon("chat", 18)} Chat with ${esc(first)}</button><button class="btn" data-act="book" data-id="${t.ini}">Book session</button></div></div>`;
+    <div class="row lf-act"><button class="btn ghost" data-act="chat" data-id="${t.id}">${icon("chat", 18)} Chat with ${esc(first)}</button><button class="btn" data-act="book" data-id="${t.id}">Book session</button></div></div>`;
 }
 function loadProfileVideo(t) {
   if (!t || !t.email || !t.video) return;
-  UTSShared.getVideo(t.email).then(b => { const el = $("#lfv"); if (b && el) { liftURL = URL.createObjectURL(b); el.src = liftURL; } });
+  UTSShared.getVideo(t.email).then(b => {
+    const el = $("#lfv"); if (!el) return;
+    if (b) { liftURL = URL.createObjectURL(b); el.src = liftURL; }
+    else { const w = el.closest(".vwrap"); if (w) w.outerHTML = '<div class="empty" style="margin-top:6px">The intro video could not be loaded right now.</div>'; }
+  });
 }
 function sessionDetail(id) {
   const s = S.sessions.find(x => x.id == id); if (!s) return "";
-  const t = tutorByName(s.mentor), blk = delayBlock(s), dl = (s.delays || []).length, fee = s.status === "accepted" ? delayFee(s.credits) : 0, first = s.mentor.split(" ")[0];
+  const t = tutorOfSession(s), blk = delayBlock(s), dl = (s.delays || []).length, fee = s.status === "accepted" ? delayFee(s.credits) : 0, first = s.mentor.split(" ")[0];
   const note = blk ? blk : fee ? `Delaying costs ${DELAY.pct}% of ${s.credits} credits = <b>${fmt(fee)} credits</b>, paid to ${esc(first)}. ${DELAY.max - dl} delay${DELAY.max - dl > 1 ? "s" : ""} left.`
     : `No fee yet: ${esc(first)} has not accepted this request. ${DELAY.max - dl} delay${DELAY.max - dl > 1 ? "s" : ""} left.`;
   return `<div class="lf-detail">${closeBtn}
@@ -348,16 +305,14 @@ function sessionDetail(id) {
     <div class="m row"><span class="chip">${s.min} min</span><span class="chip o">${s.credits} credits held</span><span class="chip ${s.status === "accepted" ? "g" : "n"}">${s.status === "accepted" ? "Accepted" : "Waiting for mentor"}</span></div>
     ${dl ? `<div><b>Changes</b>${s.delays.map(d => `<div class="rep">Moved from ${dayLabel(d.from)}, ${clockLabel(d.from)} to ${dayLabel(d.to)}, ${clockLabel(d.to)} · ${d.fee ? "fee " + fmt(d.fee) + " credits" : "no fee"}</div>`).join("")}</div>` : ""}
     <p class="note-fee">${note}</p>
-    <div class="row lf-act">${s.status === "accepted" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Join room</button>` : ""}${blk ? "" : `<button class="btn ghost" data-act="delay" data-id="${s.id}">${icon("clock", 18)} Delay</button>`}${t ? `<button class="btn ghost" data-act="chat" data-id="${t.ini}">${icon("chat", 18)} Chat</button>` : ""}<button class="btn ghost" data-act="cancel" data-id="${s.id}">${s.status === "accepted" ? "Cancel" : "Cancel request"}</button></div></div>`;
+    <div class="row lf-act">${s.status === "accepted" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Join room</button>` : ""}${blk ? "" : `<button class="btn ghost" data-act="delay" data-id="${s.id}">${icon("clock", 18)} Delay</button>`}${t ? `<button class="btn ghost" data-act="chat" data-id="${t.id}">${icon("chat", 18)} Chat</button>` : ""}<button class="btn ghost" data-act="cancel" data-id="${s.id}">${s.status === "accepted" ? "Cancel" : "Cancel request"}</button></div></div>`;
 }
 
-/* ---------- chat with a tutor (messages live in the shared store; demo mentors answer automatically) ---------- */
-const tutorMail = t => t.email || t.ini.toLowerCase() + "@mentors.demo";
-const threadOf = t => UTSShared.threadId(UTS.email, tutorMail(t));
-const CANNED = ["Hi! Happy to help. What are you stuck on?", "Sure. Share the error message or the code and we will go through it.", "I have a free slot soon. Book a session and we can fix it live.", "Got it, thanks. See you in the session!"];
+/* ---------- chat with a tutor (messages are saved to the database; the tutor sees them in the tutor app) ---------- */
+const threadOf = t => UTSShared.threadId(UTS.email, t.email);
 function chatHTML(t) {
   const th = UTSShared.chatThread(threadOf(t));
-  return th.msgs.length ? th.msgs.map(m => `<div class="msg ${m.from === "student" ? "mine" : ""}"><small>${m.from === "student" ? "You" : esc(m.name)} · ${clockLabel(m.ts)}${m.sim ? " · demo reply" : ""}</small>${esc(m.text)}</div>`).join("")
+  return th.msgs.length ? th.msgs.map(m => `<div class="msg ${m.from === "student" ? "mine" : ""}"><small>${m.from === "student" ? "You" : esc(m.name)} · ${clockLabel(m.ts)}</small>${esc(m.text)}</div>`).join("")
     : `<p class="mut" style="margin:auto;text-align:center">No messages yet. Say hello and tell ${esc(t.name.split(" ")[0])} what you are stuck on.</p>`;
 }
 function drawChat(t) { const m = $("#cmsgs"); if (!m) return; m.innerHTML = chatHTML(t); m.scrollTop = m.scrollHeight; }
@@ -368,17 +323,16 @@ const ACT = {
   liftclose: () => Lift.close(),
   theme: id => { UTSTheme.set(id); renderNav(); },
   chat: ini => {
-    const t = tutorByIni(ini); if (!t) return; chatWith = ini; UTSShared.chatSeen(threadOf(t), "student"); const first = t.name.split(" ")[0];
-    modal(`<div class="row" style="flex-wrap:nowrap">${tAv(t, 44)}<div style="flex:1"><h3>Chat with ${esc(t.name)}</h3><p class="mut">${t.live ? `${esc(first)} sees your messages in the tutor app (demo: same browser).` : "Demo mentor: replies are automatic."}</p></div></div>
+    const t = tutorById(ini); if (!t) return; chatWith = ini; UTSShared.chatSeen(threadOf(t), "student"); const first = t.name.split(" ")[0];
+    modal(`<div class="row" style="flex-wrap:nowrap">${tAv(t, 44)}<div style="flex:1"><h3>Chat with ${esc(t.name)}</h3><p class="mut">${esc(first)} sees your messages in the tutor app and can reply there.</p></div></div>
       <div class="msgs" id="cmsgs" aria-live="polite">${chatHTML(t)}</div>
       <div class="row"><input class="in" id="cin" maxlength="500" placeholder="Type a message" aria-label="Message"><button class="btn" data-act="chatsend" data-id="${ini}">${icon("send", 16)} Send</button></div>
       <div class="row"><button class="btn ghost" data-act="close">Close</button></div>`);
     const m = $("#cmsgs"); m.scrollTop = m.scrollHeight; const i = $("#cin"); i.focus(); i.addEventListener("keydown", e => { if (e.key === "Enter") ACT.chatsend(ini); });
   },
   chatsend: ini => {
-    const t = tutorByIni(ini), inp = $("#cin"), v = inp ? inp.value.trim() : ""; if (!t || !v) return; inp.value = "";
+    const t = tutorById(ini), inp = $("#cin"), v = inp ? inp.value.trim() : ""; if (!t || !v) return; inp.value = "";
     const id = threadOf(t); UTSShared.chatSend(id, "student", S.user.name, v); drawChat(t);
-    if (!t.live) setTimeout(() => { const n = UTSShared.chatThread(id).msgs.filter(m => m.from === "tutor").length; UTSShared.chatSend(id, "tutor", t.name, CANNED[n % CANNED.length], true); if (chatWith === ini) drawChat(t); }, 1400);
   },
   delay: id => {
     const s = S.sessions.find(x => x.id == id); if (!s || !(s.status === "accepted" || s.status === "requested")) return;
@@ -405,28 +359,42 @@ const ACT = {
     const reason = $("#dl-r").value, msg = $("#dl-m").value.trim(), from = s.ts;
     if (fee) { S.credits = round2(S.credits - fee); log(`Delay fee: ${s.title}`, -fee); }
     s.delays = (s.delays || []).concat([{ from, to: ts, fee, reason, ts: now }]); s.ts = ts; s.day = dayLabel(ts); s.time = clockLabel(ts); save();
-    const t = tutorByName(s.mentor), sent = t && t.email && UTSShared.notifyTutor(t.email, { kind: "delay", fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title, fromTs: from, toTs: ts, fee, reason, note: msg });
-    closeModal(); toast(`Delayed to ${s.day}, ${s.time}.${fee ? ` Fee ${fmt(fee)} credits.` : " No fee."} ${sent ? s.mentor.split(" ")[0] + " was notified." : "Saved (this demo mentor has no login to notify)."}`); go(page);
+    const t = tutorOfSession(s), sent = t && t.email && UTSShared.notifyTutor(t.email, { kind: "delay", ref: s.ref, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title, fromTs: from, toTs: ts, fee, reason, note: msg });
+    closeModal(); toast(`Delayed to ${s.day}, ${s.time}.${fee ? ` Fee ${fmt(fee)} credits.` : " No fee."} ${sent ? s.mentor.split(" ")[0] + " was notified." : "Saved."}`); go(page);
   },
   tab: id => { tab = id; go("sessions"); },
   book: id => {
-    const t = TUTORS.find(x => x.ini === id);
-    modal(`<h3>Book ${t.name}</h3><p class="mut">Level ${t.level} ${t.levelName} · ${t.skills.join(", ")}</p>
+    const t = tutorById(id); if (!t) return toast("This tutor is no longer listed.");
+    const def = new Date(Math.ceil((Date.now() + 2 * HR) / HR) * HR), p2 = n => String(n).padStart(2, "0"), dv = `${def.getFullYear()}-${p2(def.getMonth() + 1)}-${p2(def.getDate())}T${p2(def.getHours())}:00`;
+    const opts = t.slots.map(x => `<option value="${x.id}">${dayLabel(x.start)}, ${clockLabel(x.start)}</option>`).join("");
+    modal(`<h3>Book ${esc(t.name)}</h3><p class="mut">Level ${t.level} ${t.levelName} · ${esc(t.skills.join(", ") || "no skills added yet")}</p>
       <label class="f">What do you need help with?<input class="in" id="bt" value="${esc(F.q)}" placeholder="e.g. Fix useEffect loop"></label>
-      <label class="f">Time slot<select class="in" id="bs">${t.slots.map(s => `<option value="${s}">${SLOT[s].join(" · ")}</option>`).join("")}</select></label>
+      <label class="f">Time slot<select class="in" id="bs">${opts}<option value="custom">${t.slots.length ? "Another time…" : "Pick a time…"}</option></select></label>
+      <label class="f" id="bcw" ${t.slots.length ? "hidden" : ""}>Your time<input class="in" id="bc" type="datetime-local" value="${dv}"></label>
+      ${t.slots.length ? "" : `<p class="mut">${esc(t.name.split(" ")[0])} has not added open time slots yet. Pick a time and they can accept or decline it.</p>`}
       <label class="f">Duration<select class="in" id="bd">${Object.entries(COST).map(([m, c]) => `<option value="${m}">${m} min · ${c} credits</option>`).join("")}</select></label>
       <div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="confirm" data-id="${id}">Confirm booking</button></div>`);
   },
   confirm: id => {
-    const t = TUTORS.find(x => x.ini === id), [day, time] = SLOT[$("#bs").value];
-    const s = addSession(t, $("#bt").value.trim() || `Help with ${t.skills[0]}`, day, time, +$("#bd").value, "requested");
+    const t = tutorById(id); if (!t) return toast("This tutor is no longer listed.");
+    const sel = $("#bs").value, min = +$("#bd").value, now = Date.now(); let ts, slotId = null;
+    if (sel === "custom") {
+      ts = new Date($("#bc").value).getTime(); if (isNaN(ts)) return toast("Pick the time you want");
+      if (!(ts > now + 5 * 6e4)) return toast("Pick a time at least 5 minutes from now.");
+      if (ts > now + 14 * DAY) return toast("You can book at most 14 days ahead.");
+    } else { const sl = t.slots.find(x => x.id == sel); if (!sl) return toast("That time slot is no longer free."); ts = sl.start; slotId = sl.id; }
+    const clash = S.sessions.find(x => (x.status === "accepted" || x.status === "requested") && x.day !== "Now" && ts < x.ts + x.min * 6e4 && ts + min * 6e4 > x.ts);
+    if (clash) return toast(`That overlaps “${clash.title}” (${clash.day}, ${clash.time}).`);
+    const s = addSession(t, $("#bt").value.trim() || `Help with ${t.skills[0] || "my code"}`, ts, min, false, slotId);
     if (!s) return;
-    closeModal(); autoAccept(s.id); tab = "upcoming"; toast("Request sent. Credits held in escrow."); go("sessions");
+    closeModal(); tab = "upcoming"; toast(`Request sent to ${t.name.split(" ")[0]}. Credits held in escrow.`); go("sessions");
   },
   close: closeModal,
   cancel: id => {
-    const s = S.sessions.find(x => x.id == id); s.status = "cancelled"; S.credits = round2(S.credits + s.credits); log(`Refund: ${s.title}`, s.credits);
-    save(); toast("Cancelled. Credits refunded."); go(page);
+    const s = S.sessions.find(x => x.id == id); if (!s || !(s.status === "requested" || s.status === "accepted")) return;
+    s.status = "cancelled"; S.credits = round2(S.credits + s.credits); log(`Refund: ${s.title}`, s.credits);
+    save(); if (s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "cancel", ref: s.ref, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
+    closeModal(); toast("Cancelled. Credits refunded."); go(page);
   },
   join: id => {
     const s = S.sessions.find(x => x.id == id); if (!s) return toast("Session not found.");
@@ -449,16 +417,18 @@ const ACT = {
     closeModal();
   },
   finish: (id, b) => {
-    const s = S.sessions.find(x => x.id == id); s.status = "completed"; s.rating = +b.dataset.r;
+    const s = S.sessions.find(x => x.id == id); if (!s || s.status !== "accepted") return toast("Only an accepted session can be finished.");
+    s.status = "completed"; s.rating = +b.dataset.r;
     S.done++; S.mins += s.min; tick(); log(`Session with ${s.mentor}`, 0); save(); closeModal();
+    if (s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "rating", ref: s.ref, stars: s.rating, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
     toast(`Session complete! Streak: ${S.streak.days} day${S.streak.days > 1 ? "s" : ""}`); tab = "past"; go("sessions");
   },
   instantgo: () => {
     const topic = $("#it").value.trim(); if (!topic) return toast("Tell us what you are stuck on");
     const list = matchTutors({ topic, language: $("#il").value, slot: "Any" });
     if (!list.length) return toast("No mentor found for that topic. Try another.");
-    const s = addSession(list[0], `Instant help: ${topic}`, "Now", "Now", 15, "accepted");
-    if (s) { toast(`${list[0].name} is ready for you`); tab = "upcoming"; go("sessions"); }
+    const s = addSession(list[0], `Instant help: ${topic}`, Date.now(), 15, true);
+    if (s) { toast(`Request sent to ${list[0].name}. You will see it accepted here.`); tab = "upcoming"; go("sessions"); }
   },
   post: () => {
     const t = $("#dt").value.trim(); if (!t) return toast("Write your doubt first");
@@ -469,7 +439,6 @@ const ACT = {
     S.doubts.find(d => d.id == id).replies.push({ by: S.user.name, text: v }); save(); go("board");
   },
   solve: id => { S.doubts.find(d => d.id == id).solved = true; save(); toast("Marked as solved"); go("board"); },
-  buy: () => { S.credits += 5; log("Added demo credits", 5); save(); toast("+5 credits"); go("ledger"); },
   savename: () => { const v = $("#pn").value.trim(); if (v) { S.user.name = v; save(); toast("Name saved"); go("profile"); } },
   addskill: () => { const v = $("#ps").value.trim(); if (v) { S.user.skills.push(v); save(); go("profile"); } },
   rmskill: id => { S.user.skills.splice(+id, 1); save(); go("profile"); },
@@ -480,7 +449,6 @@ const ACT = {
   },
   decline: id => { S.incoming = S.incoming.filter(x => x.id != id); save(); go("requests"); },
   logout: () => UTSAuth.logout("login.html"),
-  reset: () => { if (confirm(IS_DEMO ? "Reset all demo data?" : "Reset this account's data in this browser?")) { S = seed(); save(); toast(IS_DEMO ? "Demo data reset" : "Data reset"); go("dashboard"); } }
 };
 
 document.addEventListener("click", e => {
@@ -493,7 +461,10 @@ document.addEventListener("click", e => {
   if (ACT[b.dataset.act]) ACT[b.dataset.act](b.dataset.id, b);
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modal").hidden) closeModal(); });
-document.addEventListener("input", e => { if (["q", "lang", "slot"].includes(e.target.id)) updateTutors(); });
+document.addEventListener("input", e => {
+  if (["q", "lang", "slot"].includes(e.target.id)) updateTutors();
+  if (e.target.id === "bs") { const w = $("#bcw"); if (w) w.hidden = e.target.value !== "custom"; }
+});
 
 /* ---------- tutor notifications (reschedule alerts from the tutor app) ---------- */
 const dayLabel = t => { const d = new Date(t), n = new Date(); [d, n].forEach(x => x.setHours(0, 0, 0, 0)); const k = Math.round((d - n) / 864e5);
@@ -502,21 +473,30 @@ const clockLabel = t => new Date(t).toLocaleTimeString("en-IN", { hour: "numeric
 function checkNotifs() {
   if (!window.UTS || !window.UTSShared) return;
   const un = UTSShared.notifications(UTS.email).filter(n => !n.read); if (!un.length) return;
-  un.filter(n => n.kind === "reschedule").slice().reverse().forEach(n => {          // keep my upcoming list in step with the new time
-    const s = S.sessions.find(x => (x.status === "accepted" || x.status === "requested") && x.mentor === n.mentor && x.title === n.sessionTitle) ||
-              S.sessions.find(x => (x.status === "accepted" || x.status === "requested") && x.mentor === n.mentor);
-    if (s) { s.day = dayLabel(n.toTs); s.time = clockLabel(n.toTs); s.ts = n.toTs; }
+  S.handled = S.handled || [];
+  const open = ref => S.sessions.find(x => x.ref === ref && (x.status === "accepted" || x.status === "requested"));
+  const fresh = un.filter(n => !S.handled.includes(n.id)); fresh.forEach(n => S.handled.push(n.id));
+  fresh.slice().reverse().forEach(n => {
+    if (n.kind === "reschedule") {                                                  // keep my upcoming list in step with the new time
+      const s = open(n.ref) || S.sessions.find(x => (x.status === "accepted" || x.status === "requested") && x.mentor === n.mentor && x.title === n.sessionTitle) ||
+                S.sessions.find(x => (x.status === "accepted" || x.status === "requested") && x.mentor === n.mentor);
+      if (s) { s.day = dayLabel(n.toTs); s.time = clockLabel(n.toTs); s.ts = n.toTs; }
+    } else if (n.kind === "booking_accepted") {
+      const s = S.sessions.find(x => x.ref === n.ref && x.status === "requested"); if (s) s.status = "accepted";
+    } else if (n.kind === "booking_declined" || n.kind === "booking_cancelled") {   // the tutor said no (or cancelled): credits come back
+      const s = open(n.ref); if (s) { s.status = "cancelled"; S.credits = round2(S.credits + s.credits); log(`Refund: ${s.title}`, s.credits); }
+    }
   });
   save(); UTSShared.markRead(UTS.email);
-  modal(`<h3>Notifications</h3><div class="nf">${un.map(n => `<div class="rep"><b>${esc(n.title)}</b><br>${esc(n.body)}</div>`).join("")}</div><div class="row"><button class="btn" data-act="close">Got it</button></div>`);
+  if (!fresh.length) return;
+  modal(`<h3>Notifications</h3><div class="nf">${fresh.map(n => `<div class="rep"><b>${esc(n.title)}</b><br>${esc(n.body)}</div>`).join("")}</div><div class="row"><button class="btn" data-act="close">Got it</button></div>`);
   rerender();
 }
 window.addEventListener("storage", e => {
   if (e.key === "uts_notifs") checkNotifs();
-  if (e.key === "uts_chats" && chatWith) { const t = tutorByIni(chatWith); if (t) drawChat(t); }
+  if (e.key === "uts_chats" && chatWith) { const t = tutorById(chatWith); if (t) drawChat(t); }
 });
 window.addEventListener("uts-theme", renderNav);
 
-S.sessions.filter(s => s.status === "requested").forEach(s => autoAccept(s.id));
 go("dashboard");
 checkNotifs();

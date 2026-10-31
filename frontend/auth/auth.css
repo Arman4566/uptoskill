@@ -71,10 +71,6 @@ label{display:grid;gap:.4rem;font-size:1rem;font-weight:700}
 .go:hover{filter:brightness(1.07);transform:translateY(-1px)}.go:active{transform:translateY(1px)}.go:disabled{opacity:.65;cursor:wait}
 .err{display:none;background:var(--err-bg);color:var(--err-ink);border:1px solid var(--err-line);border-radius:16px;padding:.7rem 1rem;font-size:.92rem}
 .err.on{display:block}.err a{font-weight:800}
-.demo{margin-top:1rem;padding:.55rem .6rem .55rem 1.2rem;border:1px solid var(--field-line);border-radius:999px;background:var(--field);font-size:.95rem;color:var(--ink);display:flex;justify-content:center;align-items:center;gap:1rem;flex-wrap:wrap}
-.demo b{font-weight:800}
-.demo button{border:1px solid var(--field-line);background:var(--card);border-radius:999px;padding:.5rem 1.1rem;font:inherit;font-weight:700;font-size:.92rem;cursor:pointer;color:var(--ink)}
-.demo button:hover{background:var(--brand-soft)}
 .switch{margin-top:.9rem;text-align:center;font-size:1.02rem;color:var(--muted)}
 .home{display:inline-block;margin-top:.7rem;font-size:.88rem;color:var(--muted);text-decoration:none;font-weight:600}.home:hover{color:var(--brand)}
 

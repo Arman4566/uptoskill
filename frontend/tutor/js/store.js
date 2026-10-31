@@ -1,5 +1,6 @@
 /* UpToSkill Tutor - state, credit ledger and session state machine.
-   Everything is stored in the browser (localStorage). Rule from the project plan: logic lives in code, AI only writes language. */
+   The app works on this state in memory / localStorage and shared/sync.js saves every change to the database (and loads it again on
+   the next sign-in). Rule from the project plan: logic lives in code, AI only writes language. */
 "use strict";
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -15,7 +16,7 @@ const LEVEL_RULES = { 2: [3, 0], 3: [10, 4.0], 4: [25, 4.5] };                  
 const BONUS_CAP = 3, INSTANT_WAIT = 60e3, REQ_TTL = 24 * HR;
 const RESCHEDULE_PCT = 2;                                                          // tutor pays 2% of the session credits each time he moves a lecture
 const reschedFee = credits => Math.round(credits * RESCHEDULE_PCT) / 100;
-const learnerEmail = id => id === "L1" ? "student@demo.com" : null;               // demo link: only Riya Verma has a real student login
+const learnerEmail = id => (S.users[id] && S.users[id].email) || null;              // real students are linked to their login by email
 
 /* ---------- time helpers ---------- */
 const startOfDay = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -45,14 +46,12 @@ const CODE = {
 };
 const COMMENTS = { 5: ["Explained it so clearly. Fixed in minutes.", "Patient, great examples, exactly what I needed.", "Very clear walkthrough. Would book again.", "Saved my evening, thank you!"], 4: ["Helpful session, a bit fast at the end.", "Good explanation and useful tips."], 3: ["Okay help, I needed a little more time."] };
 const SIM_REPLIES = ["Okay, trying that now...", "Oh, that makes sense. Can you show the fixed line?", "I changed it and the error is gone!", "Thanks, now I understand why it happened.", "Got it. Should I do the same in the other file?"];
-const RIVAL_NAMES = ["Vikram Joshi", "Karan Mehta", "Sana Qureshi"];
+const RIVAL_NAMES = ["Vikram Joshi", "Karan Mehta", "Sana Qureshi"];   // only used by the old simulator in sim.js, which never starts for real accounts
 
 /* ---------- state ---------- */
-const IS_DEMO = !window.UTS || UTS.email === "tutor@demo.com";   // sample history / learners / bounties only for the demo login
-const OTHERS = [{ name: "Karan Mehta", level: 4, sessions: 27, rating: 4.9 }, { name: "Vikram Joshi", level: 4, sessions: 31, rating: 4.7 }, { name: "Sana Qureshi", level: 3, sessions: 12, rating: 4.5 }, { name: "Ishita Rao", level: 2, sessions: 6, rating: 4.6 }, { name: "Ananya Gupta", level: 2, sessions: 4, rating: 4.4 }, { name: "Dev Malhotra", level: 2, sessions: 3, rating: 4.2 }];
 let S = load();
-function load() { try { const x = JSON.parse(localStorage.getItem(KEY)); if (x && x.v === 2 && (IS_DEMO || x.fresh)) return x; } catch (e) { } return seed(); }   // old copies of the demo data in real accounts are dropped once
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } };
+function load() { try { const x = JSON.parse(localStorage.getItem(KEY)); if (x && x.v === 2 && x.fresh) return x; } catch (e) { } return seed(); }   // the saved copy comes from the database (shared/sync.js); old sample-data copies are ignored
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } if (typeof syncPublic === "function") syncPublic(); };   // syncPublic (ui.js) refreshes what students see on my tutor card
 save();                                                   // persist the seed on first run
 const me = () => S.me;
 const user = id => id === "me" ? S.me : S.users[id] || { id, name: String(id).startsWith("R:") ? id.slice(2) : id === "platform" ? "Platform (simulated)" : "Unknown", level: 1, langs: [] };
@@ -81,8 +80,13 @@ function refreshLevel() {
   const old = S.me.level, l = Math.max(S.me.baseLevel || 1, levelFor(given().length, avgRating())); S.me.level = l; return l > old ? l : 0;
 }
 const levelName = l => LEVELS.find(x => x[0] === l)[1];
+/* Other real tutors, taken from the public profiles in the database (each tutor publishes level, sessions and rating). */
+function otherTutors() {
+  const me = window.UTS ? UTS.email : "", all = window.UTSShared ? UTSShared.profiles() : {};
+  return Object.keys(all).filter(k => k !== me && all[k].pub).map(k => { const p = all[k].pub; return { name: p.name || k, level: p.level || 2, sessions: p.sessions || 0, rating: p.rating || 0 }; });
+}
 function leaderboard() {
-  const rows = S.others.map(o => ({ ...o })).concat([{ name: S.me.name, level: S.me.level, sessions: given().length, rating: +avgRating().toFixed(1), me: true }]);
+  const rows = otherTutors().concat([{ name: S.me.name, level: S.me.level, sessions: given().length, rating: +avgRating().toFixed(1), me: true }]);
   return rows.sort((a, b) => b.sessions - a.sessions || b.rating - a.rating);
 }
 function checkBadges() {
@@ -112,13 +116,16 @@ const Sess = {
     const s = sess(id); if (!s || s.status !== "requested") return fail("This request is no longer open.");
     const l = user(s.learnerId);
     if (S.me.level <= l.level) return fail("Mentor level must be higher than the learner's level.");
-    if (bal(s.learnerId) < s.credits) return fail(`${l.name} does not have enough credits (needs ${s.credits}).`);   // balance check before hold
-    addLedger(s.learnerId, -s.credits, "hold", "session", s.id, "Held: " + s.title);
+    // A real student already paid (held) the credits in the student app when booking; only simulated learners are held here.
+    if (!s.prepaid && bal(s.learnerId) < s.credits) return fail(`${l.name} does not have enough credits (needs ${s.credits}).`);   // balance check before hold
+    if (!s.prepaid) addLedger(s.learnerId, -s.credits, "hold", "session", s.id, "Held: " + s.title);
     s.status = "accepted"; s.acceptedTs = Date.now();
     const sl = S.slots.find(x => x.id === s.slotId); if (sl) { sl.booked = true; sl.sid = s.id; }
+    tellStudent(s, "booking_accepted", "Session accepted", `${S.me.name} accepted “${s.title}”. Your credits stay held until the session is done.`);
     return good();
   },
-  decline(id) { const s = sess(id); if (!s || s.status !== "requested") return fail("This request is no longer open."); s.status = "declined"; return good(); },
+  decline(id) { const s = sess(id); if (!s || s.status !== "requested") return fail("This request is no longer open."); s.status = "declined";
+    tellStudent(s, "booking_declined", "Request declined", `${S.me.name} declined “${s.title}”. Your ${s.credits} credits were refunded.`); return good(); },
   reschedule(id, ts, reason) {
     const s = sess(id); if (!s || s.status !== "accepted") return fail("Only accepted sessions that have not started can be moved.");
     if (!(ts > Date.now() + 5 * 6e4)) return fail("Pick a time at least 5 minutes from now.");
@@ -137,7 +144,8 @@ const Sess = {
   },
   start(id) { const s = sess(id); if (!s) return fail("Session not found."); if (s.status === "in_progress") return good(); if (s.status !== "accepted") return fail("Session cannot start from status " + s.status + "."); s.status = "in_progress"; s.startTs = Date.now(); return good(); },
   release(s, status) {
-    addLedger(s.learnerId, s.credits, "release", "session", s.id, "Released: " + s.title);
+    if (!s.prepaid) addLedger(s.learnerId, s.credits, "release", "session", s.id, "Released: " + s.title);
+    tellStudent(s, "booking_cancelled", status === "no_show" ? "Marked as no-show" : "Session cancelled", `${S.me.name} ${status === "no_show" ? "marked “" + s.title + "” as a no-show" : "cancelled “" + s.title + "”"}. Your ${s.credits} credits were refunded.`);
     const sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; }
     s.status = status; s.endTs = Date.now();
   },
@@ -150,17 +158,31 @@ const Sess = {
     addLedger("me", s.credits - fee, "payout", "session", s.id, "Session with " + user(s.learnerId).name);
     if (fee) addLedger("platform", fee, "platform_fee", "session", s.id, "Simulated platform fee");
     s.status = "completed"; s.endTs = Date.now(); s.settledTs = s.endTs; s.mentorNotes = notes || "";
-    s.rateAt = s.endTs + 4000; s.notesAt = s.endTs + 1500; s.noteStatus = "pending";
+    // A real student rates on their own (arrives as a notification, possibly before the session was completed here).
+    s.rateAt = s.ref ? (s.pendingRating ? s.endTs + 500 : 0) : s.endTs + 4000;
+    s.notesAt = s.endTs + 1500; s.noteStatus = "pending";
     const sl = S.slots.find(x => x.sid === s.id); if (sl) { sl.booked = false; sl.sid = null; sl.done = true; }
     return good();
   }
 };
 
+/* Tell the student (in their own app) what happened to their booking. Returns false for simulated learners. */
+function tellStudent(s, kind, title, body) {
+  const to = learnerEmail(s.learnerId); if (!to || !s.ref || !window.UTSShared) return false;
+  return UTSShared.notify(to, { kind, ref: s.ref, title, body, mentor: S.me.name, sessionTitle: s.title });
+}
+/* A real student who booked me: remembered by email so the session list can show their name. */
+function ensureLearner(email, name, level, langs) {
+  const key = "E:" + email, u = S.users[key] || (S.users[key] = { id: key });
+  u.name = name || u.name || email; u.email = email; u.level = level || u.level || 1; u.langs = langs && langs.length ? langs : (u.langs || ["English"]);
+  return key;
+}
+
 /* ---------- ratings, bonus (capped per day) ---------- */
-function rate(s) {
+function rate(s, real) {                                   // real = { stars, comment } from the student; without it a simulated learner rates
   if (S.ratings.some(r => r.sid === s.id)) return null;
-  const r = Math.random(), stars = r < .7 ? 5 : r < .95 ? 4 : 3, pool = COMMENTS[stars];
-  S.ratings.push({ sid: s.id, learnerId: s.learnerId, stars, comment: pool[Math.floor(Math.random() * pool.length)], ts: Date.now() });
+  const r = Math.random(), stars = real ? real.stars : r < .7 ? 5 : r < .95 ? 4 : 3, pool = COMMENTS[stars];
+  S.ratings.push({ sid: s.id, learnerId: s.learnerId, stars, comment: real ? (real.comment || "") : pool[Math.floor(Math.random() * pool.length)], ts: Date.now() });
   let bonus = 0;
   if (stars === 5) {
     const today = S.ledger.filter(x => x.uid === "me" && x.reason === "bonus" && x.ts >= startOfDay(Date.now())).length;
@@ -186,75 +208,14 @@ function refundBounty(b) {
 function roomGet(id) { try { const r = JSON.parse(localStorage.getItem(ROOM(id))); if (r) return r; } catch (e) { } return { code: "", msgs: [], pres: {}, endReq: false }; }
 function roomSet(id, fn) { const r = roomGet(id); fn(r); try { localStorage.setItem(ROOM(id), JSON.stringify(r)); } catch (e) { } return r; }
 
-/* ---------- seed ---------- */
-/* A real (non-demo) tutor starts clean: no fake history, learners, requests or bounties; 10 welcome credits.
-   New tutors start at level 2 (Helper) - the same as the server - so level-1 students are allowed to book them. */
-function freshSeed() {
-  const now = Date.now(), MAX = Number.MAX_SAFE_INTEGER;
-  const T = { v: 2, fresh: true, nid: 1000, ledger: [], sessions: [], bounties: [], instant: [], slots: [], ratings: [], badges: [], notes: {}, spawn: { inst: MAX, req: MAX, nInst: 0, nReq: 0 }, ai: { calls: [] }, settings: { aiOn: true, feePct: 0 }, toasts: [] };
-  T.me = { id: "me", name: window.UTS ? UTS.name : "Tutor", level: 2, baseLevel: 2, bio: "", langs: ["English"], online: true, joined: now, skills: [] };
-  T.users = {}; T.others = OTHERS.slice();
-  T.ledger.push({ id: T.nid++, uid: "me", delta: 10, reason: "starter", refType: null, refId: null, note: "Welcome credits", ts: now });
-  return T;
-}
+/* ---------- first start of a new account ---------- */
+/* A tutor starts clean: no history, learners, requests or bounties; 10 welcome credits. Everything after that is real data that
+   shared/sync.js saves to the database. New tutors start at level 2 (Helper), the same as the server, so level-1 students can book them. */
 function seed() {
-  if (!IS_DEMO) return freshSeed();
-  const now = Date.now(), R = rng(11), pick = a => a[Math.floor(R() * a.length)];
-  const T = { v: 2, nid: 1000, ledger: [], sessions: [], bounties: [], instant: [], slots: [], ratings: [], badges: [], notes: {}, spawn: { inst: now + 6000, req: now + 30000, nInst: 0, nReq: 0 }, ai: { calls: [] }, settings: { aiOn: true, feePct: 0 }, toasts: [] };
-  const joined = now - 16 * 30 * DAY;
-  T.me = { id: "me", name: window.UTS ? UTS.name : "Neha Sharma", level: 3, bio: "Final-year CS student. I love explaining React and SQL with small, runnable examples.", langs: ["English", "Hindi"], online: true, joined,
-    skills: [{ n: "React", exp: 3 }, { n: "JavaScript", exp: 3 }, { n: "Node", exp: 2 }, { n: "SQL", exp: 2 }, { n: "Python", exp: 2 }, { n: "DSA", exp: 2 }] };
-  const L = [["Riya Verma", 1, ["English"]], ["Rohit Das", 1, ["Hindi", "English"]], ["Meera Patel", 1, ["English"]], ["Arjun Thakur", 1, ["Hindi"]], ["Aman Khan", 1, ["English", "Hindi"]], ["Pooja Singh", 2, ["English"]],
-    ["Sameer Kulkarni", 1, ["Marathi", "English"]], ["Kavya Nair", 2, ["English"]], ["Dev Malhotra", 2, ["Hindi", "English"]], ["Ananya Gupta", 2, ["English", "Hindi"]], ["Tanvi Shah", 1, ["English"]], ["Imran Sheikh", 1, ["Hindi"]]];
-  T.users = {}; L.forEach((l, i) => { T.users["L" + (i + 1)] = { id: "L" + (i + 1), name: l[0], level: l[1], langs: l[2] }; });
-  T.others = OTHERS.slice();
-  const led = (u, d, r, rt, ri, n, ts) => T.ledger.push({ id: T.nid++, uid: u, delta: d, reason: r, refType: rt, refId: ri, note: n, ts });
-  led("me", 10, "starter", null, null, "Welcome credits", joined);
-  Object.keys(T.users).forEach(k => led(k, 10, "starter", null, null, "Welcome credits", joined));
-  // availability: next days, future only
-  const slot = (d, h1, h2) => { let a = startOfDay(now) + d * DAY + h1 * HR; while (a < now + 30 * 6e4) a += DAY; return { id: T.nid++, start: a, end: a + (h2 - h1) * HR, booked: false, sid: null }; };
-  const sl = [slot(0, 18, 19), slot(0, 20, 21), slot(1, 11, 12), slot(1, 17, 18.5), slot(1, 20, 21), slot(2, 10, 11), slot(2, 18, 19), slot(3, 16, 17), slot(5, 10, 12)];
-  T.slots = sl;
-  // history: completed sessions spread over ~15 months, newest ones inside the last 24h / week
-  const hist = [[470, 2], [431, 4], [385, 4], [342, 2], [301, 6], [255, 4], [210, 4], [172, 2], [141, 6], [112, 4], [84, 4], [58, 2], [33, 4], [16, 4], [6.5, 6], [1.2, 4], [0.3, 4]];
-  hist.forEach(([off, cr], i) => {
-    const learner = "L" + (1 + Math.floor(R() * 12)), skill = pick(Object.keys(CODE)), ts = now - off * DAY, id = T.nid++, ai = AI.analyze(pick(PROBLEMS[skill]));
-    const s = { id, type: R() < .25 ? "instant" : "booked", status: "completed", learnerId: learner, title: ai.title, problem: PROBLEMS[skill][0], tags: ai.tags, difficulty: ai.difficulty, minutes: cr === 2 ? 15 : cr === 4 ? 30 : 45, credits: cr, brief: null, slotTs: ts, reqTs: ts - HR, startTs: ts, endTs: ts + cr * 7.5 * 6e4, settledTs: ts + cr * 7.5 * 6e4, token: uid(), noteStatus: "ok" };
-    T.sessions.push(s);
-    led("me", cr, "payout", "session", id, "Session with " + T.users[learner].name, s.endTs);
-    const stars = R() < .78 ? 5 : 4; T.ratings.push({ sid: id, learnerId: learner, stars, comment: pick(COMMENTS[stars]), ts: s.endTs + 6e4 });
-    if (stars === 5 && i % 2 === 0) led("me", 1, "bonus", "session", id, "5-star bonus", s.endTs + 6e4);
-    T.notes[id] = { ...AI.summarize(s, [], CODE[skill] || ""), finalCode: CODE[skill] || "", status: "ok", ts: s.endTs };
-    if (i % 3 === 1) led("me", 1 + (i % 4), "bounty_payout", "bounty", 900 + i, "Bounty answer accepted", ts + 5 * HR);
-  });
-  // learner side of each of today's rows is not shown; open work below uses real holds
-  const mk = (type, status, learner, skill, min, slotId, extra) => {
-    const text = pick(PROBLEMS[skill]), ai = AI.analyze(text), id = T.nid++, cr = type === "instant" ? priceOf(min, true) : priceOf(min);
-    const s = { id, type, status, learnerId: learner, title: ai.title, problem: text, tags: ai.tags, difficulty: ai.difficulty, minutes: min, credits: cr, brief: { problem_summary: ai.problem_summary, already_tried: ai.already_tried, topics_to_prepare: ai.topics_to_prepare }, slotId, slotTs: slotId ? T.slots.find(x => x.id === slotId).start : now, reqTs: now - 20 * 6e4, token: uid(), ...extra };
-    T.sessions.push(s); return s;
-  };
-  const a1 = mk("booked", "accepted", "L1", "React", 30, sl[0].id), a2 = mk("booked", "accepted", "L7", "Python", 30, sl[1].id), a3 = mk("booked", "accepted", "L5", "SQL", 15, sl[2].id);
-  mk("booked", "requested", "L2", "Node", 30, sl[3].id); mk("booked", "requested", "L3", "React", 15, sl[5].id); mk("booked", "requested", "L4", "SQL", 45, sl[4].id);
-  // bounties
-  const bt = (title, tags, reward, author, hrs, status, answers, extra) => ({ id: T.nid++, authorId: author, title, tags, reward, status, deadline: now + hrs * HR, answers: answers || [], ts: now - 3 * HR, ...extra });
-  const ans = (by, body, acc) => ({ id: T.nid++, helperId: by, body, accepted: !!acc, ts: now - HR });
-  T.bounties = [
-    bt("Why does my map() return undefined?", ["JavaScript"], 2, "L5", 20, "open", [ans("R:Vikram Joshi", "Check that you return inside the callback.")]),
-    bt("GROUP BY totals are wrong after joining three tables", ["SQL"], 5, "L6", 9, "open"),
-    bt("Express: /users/me never matches, /users/:id always wins", ["Node"], 4, "L8", 30, "open"),
-    bt("How do I debounce a search input in React?", ["React", "JavaScript"], 3, "L9", 14, "open"),
-    bt("Difference between INNER and LEFT JOIN?", ["SQL"], 2, "L10", -30, "solved", [ans("R:Karan Mehta", "INNER keeps only matching rows; LEFT keeps every row from the left table.", 1)]),
-    bt("Git rebase vs merge: which one before a PR?", ["Git"], 3, "L11", -60, "solved", [ans("me", "Rebase your branch onto main to keep history linear, then merge with a PR.", 1)]),
-    bt("Python list vs tuple, when to use which?", ["Python"], 3, "L9", -30, "expired")
-  ];
-  T.bounties.forEach(b => {
-    if (b.authorId === "me") return;
-    led(b.authorId, -b.reward, "bounty_hold", "bounty", b.id, "Escrow: " + b.title, b.ts);
-    if (b.status === "expired") led(b.authorId, b.reward, "bounty_refund", "bounty", b.id, "Refund: " + b.title, b.deadline);
-    if (b.status === "solved" && b.answers[0].helperId === "me") led("me", b.reward, "bounty_payout", "bounty", b.id, "Bounty: " + b.title, b.ts + HR);
-  });
-  // holds for the 3 accepted sessions (ledger rows for learners)
-  [a1, a2, a3].forEach(s => { led(s.learnerId, -s.credits, "hold", "session", s.id, "Held: " + s.title, now - 10 * 6e4); const x = T.slots.find(q => q.id === s.slotId); x.booked = true; x.sid = s.id; });
-  T.badges = [{ key: "first_session", ts: joined }, { key: "ten_sessions", ts: now - 60 * DAY }];
+  const now = Date.now(), MAX = Number.MAX_SAFE_INTEGER;
+  const T = { v: 2, fresh: true, nid: 1000, ledger: [], sessions: [], bounties: [], instant: [], slots: [], ratings: [], badges: [], notes: {}, spawn: { inst: MAX, req: MAX, nInst: 0, nReq: 0 }, ai: { calls: [] }, settings: { aiOn: true, feePct: 0 }, toasts: [], handled: [] };
+  T.me = { id: "me", name: window.UTS ? UTS.name : "Tutor", level: 2, baseLevel: 2, bio: "", langs: ["English"], online: true, joined: now, skills: [] };
+  T.users = {};
+  T.ledger.push({ id: T.nid++, uid: "me", delta: 10, reason: "starter", refType: null, refId: null, note: "Welcome credits", ts: now });
   return T;
 }

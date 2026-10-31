@@ -10,10 +10,8 @@ Flow: `index.html` (landing) -> Learner / Tutor -> `student/login.html` or `tuto
 | `student/` | Student login + student app (`lift.js` is the lift-and-fly card animation) |
 | `tutor/` | Tutor login + tutor app (`js/` has the ledger, sim, AI, charts, UI) |
 | `auth/` | Shared login code (`auth.js`), form logic (`login.js`), theme + language (`prefs.js`), styles |
-| `shared/` | `shared.js`: tutor public profile (photo, qualifications, intro video), notifications both ways, student-tutor chat. `theme.js` + `theme.css`: light / dark / system theme for both apps. Used by both apps |
+| `shared/` | `shared.js`: tutor public profile (photo, qualifications, intro video), notifications both ways, student-tutor chat. `sync.js`: saves all of that to the database and loads it back. `theme.js` + `theme.css`: light / dark / system theme for both apps. Used by both apps |
 | `assets/` | Logo, favicon, plane, classroom image |
 
-Demo accounts (password `demo1234`): `student@demo.com`, `tutor@demo.com`.
-
-Sign-in and sign-up call the backend (default `http://localhost:4000`, change with `localStorage.setItem("uts_api", "https://your-server")`). If it is unreachable the pages fall back to browser-only accounts (localStorage) and show an "Offline mode" bar.
-Only the two demo logins start with sample data; every new account starts empty with 10 credits. App data (sessions, doubts, chat) is still stored in the browser; real bookings are in **Live Lessons** (`lessons.html`), which uses the server.
+Sign-in and sign-up call the backend (default `http://localhost:4000`, change with `localStorage.setItem("uts_api", "https://your-server")`). If it is unreachable you get an error message (no offline accounts).
+Every account starts empty with 10 credits. App data (sessions, doubts, ledger, profile, chat, notifications) is saved to the database by `shared/sync.js` and loaded again at the next sign-in, on any device. Real bookings on the server's own tables are in **Live Lessons** (`lessons.html`).

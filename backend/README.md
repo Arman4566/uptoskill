@@ -6,7 +6,8 @@ cd backend
 cp .env.example .env          # set DATABASE_URL and JWT_SECRET
 npm install
 npm run db:migrate            # applies db/schema.sql (db:reset drops everything first)
-npm run db:seed               # demo users, skills, slots (password for all: demo1234). Safe to re-run.
+npm run db:seed               # skill tags only (no accounts are created). Safe to re-run.
+npm run db:purge-demo         # deletes the old demo accounts and their data (also runs in db:migrate)
 npm run dev                   # API on :4000
 npm run test:race             # 20-way parallel accept/complete/cancel checks
 ```

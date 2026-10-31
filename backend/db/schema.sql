@@ -157,3 +157,40 @@ CREATE TABLE IF NOT EXISTS badges (
   awarded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, badge_key)
 );
+
+-- ---------------------------------------------------------------------------------------------
+-- App data saved by the website (student app, tutor app). Everything a user adds in the frontend
+-- is stored here instead of only in the browser.
+-- ---------------------------------------------------------------------------------------------
+
+-- Private per-account data (a student's sessions / credits / doubts, a tutor's sessions / ledger / settings ...).
+CREATE TABLE IF NOT EXISTS user_state (
+  user_id    INT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key        TEXT NOT NULL,
+  data       JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, key)
+);
+
+-- Data that two accounts both see: tutor public profiles, student<->tutor chat threads, notifications.
+-- collection: 'profiles' | 'chats' | 'notifs' (tutor -> student) | 'tnotifs' (student -> tutor)
+-- item_key:   profiles: owner email · chats: "student-email|tutor-email" · notifs: notification id
+-- owner_email / to_email decide who may read and write the row.
+CREATE TABLE IF NOT EXISTS shared_items (
+  collection TEXT NOT NULL CHECK (collection IN ('profiles','chats','notifs','tnotifs')),
+  item_key   TEXT NOT NULL,
+  owner_id   INT  REFERENCES users(id) ON DELETE CASCADE,
+  to_email   TEXT,
+  data       JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (collection, item_key)
+);
+CREATE INDEX IF NOT EXISTS idx_shared_to ON shared_items (collection, to_email);
+
+-- A tutor's intro video (max 1 minute, up to 100 MB), so students on other devices can play it.
+CREATE TABLE IF NOT EXISTS tutor_videos (
+  user_id    INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  mime       TEXT NOT NULL,
+  data       BYTEA NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
