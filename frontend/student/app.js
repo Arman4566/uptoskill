@@ -179,7 +179,7 @@ function sessionHTML(l) {
   const st = { accepted: ["g", "Accepted"], requested: ["n", "Waiting for mentor"], completed: ["g", "Completed" + (l.rating ? ` · ${l.rating}★` : "")], cancelled: ["n", "Cancelled"] }[l.status];
   const open = l.status === "accepted" || l.status === "requested", can = open && !delayBlock(l), dl = (l.delays || []).length;
   const delayBtn = can ? `<button class="btn ghost" data-act="delay" data-id="${l.id}">${icon("clock", 18)} Delay</button>` : "";
-  const btn = l.status === "accepted" ? `<button class="btn" data-act="join" data-id="${l.id}">${icon("video", 18)} Join room</button>${delayBtn}<button class="btn ghost" data-act="cancel" data-id="${l.id}">Cancel</button>`
+  const btn = l.status === "accepted" ? `<button class="btn" data-act="join" data-id="${l.id}">${icon("video", 18)} Join room</button><button class="btn orange" data-act="endsession" data-id="${l.id}">End session</button>${delayBtn}<button class="btn ghost" data-act="cancel" data-id="${l.id}">Cancel</button>`
     : l.status === "requested" ? `${delayBtn}<button class="btn ghost" data-act="cancel" data-id="${l.id}">Cancel request</button>`
     : l.status === "completed" ? `<button class="btn orange" data-act="quiz" data-id="${l.id}">${icon("quiz", 18)} Take quiz</button>` : "";
   return `<div class="card lec" ${open ? `data-lift="session:${l.id}"` : ""}><div class="when"><small>${l.day}</small><b>${l.time}</b></div><div class="info"><div class="t">${esc(l.title)}</div>
@@ -324,7 +324,7 @@ function sessionDetail(id) {
     <div class="m row"><span class="chip">${s.min} min</span><span class="chip o">${s.credits} credits held</span><span class="chip ${s.status === "accepted" ? "g" : "n"}">${s.status === "accepted" ? "Accepted" : "Waiting for mentor"}</span></div>
     ${dl ? `<div><b>Changes</b>${s.delays.map(d => `<div class="rep">Moved from ${dayLabel(d.from)}, ${clockLabel(d.from)} to ${dayLabel(d.to)}, ${clockLabel(d.to)} · ${d.fee ? "fee " + fmt(d.fee) + " credits" : "no fee"}</div>`).join("")}</div>` : ""}
     <p class="note-fee">${note}</p>
-    <div class="row lf-act">${s.status === "accepted" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Join room</button>` : ""}${blk ? "" : `<button class="btn ghost" data-act="delay" data-id="${s.id}">${icon("clock", 18)} Delay</button>`}${t ? `<button class="btn ghost" data-act="chat" data-id="${t.id}">${icon("chat", 18)} Chat</button>` : ""}<button class="btn ghost" data-act="cancel" data-id="${s.id}">${s.status === "accepted" ? "Cancel" : "Cancel request"}</button></div></div>`;
+    <div class="row lf-act">${s.status === "accepted" ? `<button class="btn" data-act="join" data-id="${s.id}">${icon("video", 18)} Join room</button><button class="btn orange" data-act="endsession" data-id="${s.id}">End session</button>` : ""}${blk ? "" : `<button class="btn ghost" data-act="delay" data-id="${s.id}">${icon("clock", 18)} Delay</button>`}${t ? `<button class="btn ghost" data-act="chat" data-id="${t.id}">${icon("chat", 18)} Chat</button>` : ""}<button class="btn ghost" data-act="cancel" data-id="${s.id}">${s.status === "accepted" ? "Cancel" : "Cancel request"}</button></div></div>`;
 }
 
 /* ---------- chat with a tutor (messages are saved to the database; the tutor sees them in the tutor app) ---------- */
@@ -421,9 +421,7 @@ const ACT = {
     modal(`<h3>Join virtual classroom</h3><p class="mut">${esc(s.title)} · with ${esc(s.mentor)}</p>
       <label class="f">Room code or invite link<input class="in" id="roomInviteInput" maxlength="500" value="${esc(s.room || "")}" placeholder="Paste the tutor's invite link or room code"></label>
       <p class="mut">Paste the invite link or room code shared by your tutor to join the same room.</p>
-      <div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="openroom" data-id="${id}">${icon("video", 18)} Join room</button></div>
-      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0"><p class="mut">Lesson finished? End the session and rate your mentor:</p>
-      <div class="row">${[1, 2, 3, 4, 5].map(n => `<button class="btn ghost" data-act="finish" data-id="${id}" data-r="${n}">${n}★</button>`).join("")}</div>`);
+      <div class="row"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="openroom" data-id="${id}">${icon("video", 18)} Join room</button></div>`);
   },
   openroom: id => {
     const s = S.sessions.find(x => x.id == id); if (!s) return toast("Session not found.");
@@ -436,11 +434,13 @@ const ACT = {
     window.open("../virtual-room.html?room=" + encodeURIComponent(room) + "&name=" + encodeURIComponent(S.user.name) + "&role=student&sid=" + encodeURIComponent(s.id) + "&ref=" + encodeURIComponent(s.ref || "") + "&peer=" + encodeURIComponent(s.mentorEmail || "") + "&pn=" + encodeURIComponent(s.mentor) + (api ? "&api=" + encodeURIComponent(api) : ""), "_blank", "noopener");
     closeModal();
   },
-  finish: (id, b) => {
-    const s = S.sessions.find(x => x.id == id); if (!s || s.status !== "accepted") return toast("Only an accepted session can be finished.");
-    completeSession(s, +b.dataset.r, ""); closeModal();
-    toast(`Session complete! Streak: ${S.streak.days} day${S.streak.days > 1 ? "s" : ""}`); tab = "past"; go("sessions");
-    askQuiz(s);
+  endsession: id => {                                   // the student ends the session: review window first, then the optional quiz offer
+    const s = S.sessions.find(x => x.id == id); if (!s || s.status !== "accepted") return toast("Only an accepted session can be ended.");
+    completeSession(s, 0, "");
+    toast(`Session complete! Streak: ${S.streak.days} day${S.streak.days > 1 ? "s" : ""}`);
+    tab = "past"; go("sessions");
+    openReview({ ref: s.ref, peer: s.mentorEmail || "", pn: s.mentor, asLearner: true });
+    askQuiz(s);                                         // waits (RV.open) until the review is sent or skipped
   },
   instantgo: () => {
     const topic = $("#it").value.trim(); if (!topic) return toast("Tell us what you are stuck on");
@@ -590,8 +590,15 @@ const LAUNCH_Q = new URLSearchParams(location.search);          // read once at 
 const RV = { stars: 0, kind: "mentor", ref: "", peer: "", open: false };
 function completeSession(s, stars, comment) {
   if (s.status === "accepted") { s.status = "completed"; S.done++; S.mins += s.min; tick(); log(`Session with ${s.mentor}`, 0); }
-  s.rating = stars; s.review = comment; save();
-  if (s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "rating", ref: s.ref, stars, comment, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
+  if (stars) { s.rating = stars; s.review = comment; } save();
+  if (stars && s.mentorEmail) UTSShared.notifyTutor(s.mentorEmail, { kind: "rating", ref: s.ref, stars, comment, fromStudent: UTS.email, studentName: S.user.name, sessionTitle: s.title });
+}
+function openReview({ ref, peer, pn, asLearner }) {
+  Object.assign(RV, { stars: 0, kind: asLearner ? "mentor" : "learner", ref, peer, open: true });
+  modal(`<h3>How was the session with ${esc(pn)}?</h3><p class="mut">${asLearner ? "Rate your mentor." : "Rate your learner."} Your review is sent to them right away.</p>
+    <div class="row">${[1, 2, 3, 4, 5].map(n => `<button class="btn ghost" data-act="rvstar" data-r="${n}">${n}★</button>`).join("")}</div>
+    <label class="f" style="margin-top:10px">Comment (optional)<textarea class="in" id="rvtext" maxlength="400" rows="3" placeholder="What went well? What could be better?"></textarea></label>
+    <div class="row"><button class="btn ghost" data-act="close">Skip</button><button class="btn" data-act="rvsend">Send review</button></div>`);
 }
 function openReviewFromUrl() {
   const q = LAUNCH_Q; if (q.get("review") !== "1") return;
@@ -599,11 +606,7 @@ function openReviewFromUrl() {
   const ref = q.get("ref") || "", peer = q.get("peer") || "", pn = q.get("pn") || "your partner";
   const asLearner = S.sessions.some(x => x.ref === ref), asMentor = (S.mentorSessions || []).some(x => x.ref === ref);
   if (!asLearner && !asMentor) return;
-  Object.assign(RV, { stars: 0, kind: asLearner ? "mentor" : "learner", ref, peer, open: true });
-  modal(`<h3>How was the session with ${esc(pn)}?</h3><p class="mut">${asLearner ? "Rate your mentor." : "Rate your learner."} Your review is sent to them right away.</p>
-    <div class="row">${[1, 2, 3, 4, 5].map(n => `<button class="btn ghost" data-act="rvstar" data-r="${n}">${n}★</button>`).join("")}</div>
-    <label class="f" style="margin-top:10px">Comment (optional)<textarea class="in" id="rvtext" maxlength="400" rows="3" placeholder="What went well? What could be better?"></textarea></label>
-    <div class="row"><button class="btn ghost" data-act="close">Skip</button><button class="btn" data-act="rvsend">Send review</button></div>`);
+  openReview({ ref, peer, pn, asLearner });
 }
 window.addEventListener("uts-theme", renderNav);
 

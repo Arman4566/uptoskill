@@ -125,3 +125,4 @@ The quiz update was built on the Round 6 snapshot (before the classroom editor/n
 
 ## Round: Gemini + weekly events + daily reminders + whiteboard pages
 See `NEW_FEATURES.md`.
+- Student app: the "Join virtual classroom" popup no longer has the star rating. Review + optional quiz now start when the student ENDS the session: the new "End session" button on an accepted session, or Leave inside the classroom.
